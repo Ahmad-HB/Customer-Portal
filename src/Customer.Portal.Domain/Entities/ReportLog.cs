@@ -12,7 +12,7 @@ public class ReportLog : FullAuditedEntity<Guid>
     
     public string Subject { get; set; }
     
-    public ReportContent Content { get; set; }
+    public string Content { get; set; }
     
     public DateTime GeneratedAt { get; set; }
 }

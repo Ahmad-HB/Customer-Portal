@@ -17,6 +17,7 @@ using Volo.Abp.Emailing;
 using Volo.Abp.FeatureManagement;
 using Volo.Abp.Identity;
 using Volo.Abp.TenantManagement;
+using Volo.Abp.TextTemplating.Scriban;
 
 namespace Customer.Portal;
 
@@ -33,7 +34,8 @@ namespace Customer.Portal;
     typeof(AbpIdentityDomainModule),
     typeof(AbpOpenIddictDomainModule),
     typeof(AbpTenantManagementDomainModule),
-    typeof(BlobStoringDatabaseDomainModule)
+    typeof(BlobStoringDatabaseDomainModule),
+    typeof(AbpTextTemplatingScribanModule)
     )]
 public class PortalDomainModule : AbpModule
 {
