@@ -11,11 +11,11 @@ public class TicketComment : FullAuditedEntity<Guid>
     
     public SupportTicket Ticket { get; set; }
     
-    public string Comment { get; set; }
-    
     public Guid UserId { get; set; }
     
     public IdentityUser User { get; set; }
+    
+    public string Comment { get; set; }
     
     public DateTime CommentedAt { get; set; }
     

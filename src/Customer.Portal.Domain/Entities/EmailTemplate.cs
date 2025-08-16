@@ -1,14 +1,12 @@
-using System;
 using Customer.Portal.Enums;
-using Volo.Abp.Domain.Entities.Auditing;
 
 namespace Customer.Portal.Entities;
 
-public class ReportTemplate : FullAuditedEntity<Guid>
+public class EmailTemplate
 {
     public TemplateType TemplateType { get; set; }
     
-    public ReportTypes ReportType { get; set; }
+    public EmailType EmailType { get; set; }
     
     public string Name { get; set; }
     

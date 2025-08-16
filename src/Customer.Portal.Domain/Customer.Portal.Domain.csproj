@@ -22,7 +22,6 @@
     <PackageReference Include="Volo.Abp.FeatureManagement.Domain" Version="9.1.0" />
     <PackageReference Include="Volo.Abp.SettingManagement.Domain" Version="9.1.0" />
     <PackageReference Include="Volo.Abp.BlobStoring.Database.Domain" Version="9.1.0" />
-    <PackageReference Include="Volo.Abp.TextTemplating.Scriban" Version="9.3.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,7 +34,7 @@
     <Folder Include="FeaturesManagers\MCustomerPlan\" />
     <Folder Include="FeaturesManagers\MEmailLog\" />
     <Folder Include="FeaturesManagers\MServicePlan\" />
-    <Folder Include="FeaturesManagers\MServiceReport\" />
+    <Folder Include="FeaturesManagers\MReport\" />
     <Folder Include="FeaturesManagers\MSupportTicket\" />
     <Folder Include="FeaturesManagers\MTicketComment\" />
   </ItemGroup>

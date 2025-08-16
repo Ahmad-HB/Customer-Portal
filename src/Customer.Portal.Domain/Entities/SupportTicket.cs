@@ -6,12 +6,12 @@ using Volo.Abp.Identity;
 
 namespace Customer.Portal.Entities;
 
-public class SupportTicket : FullAuditedEntity<Guid>
+public class SupportTicket : FullAuditedAggregateRoot<Guid>
 {
 
-    public Guid CustomerId { get; set; }
+    public Guid AppUserId { get; set; }
 
-    public IdentityUser Customer { get; set; }
+    public AppUser AppUser { get; set; }
     
     public Guid SupportagentId { get; set; }
 
