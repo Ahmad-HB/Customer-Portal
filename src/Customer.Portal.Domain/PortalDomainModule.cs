@@ -34,7 +34,8 @@ namespace Customer.Portal;
     typeof(AbpIdentityDomainModule),
     typeof(AbpOpenIddictDomainModule),
     typeof(AbpTenantManagementDomainModule),
-    typeof(BlobStoringDatabaseDomainModule)
+    typeof(BlobStoringDatabaseDomainModule),
+    typeof(AbpTextTemplatingScribanModule)
     )]
 public class PortalDomainModule : AbpModule
 {

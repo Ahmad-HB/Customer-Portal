@@ -1,6 +1,7 @@
 using Customer.Portal.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Volo.Abp.EntityFrameworkCore.Modeling;
 
 namespace Customer.Portal.Configurations;
 
@@ -8,6 +9,8 @@ public class AppUserConfigurations : IEntityTypeConfiguration<AppUser>
 {
     public void Configure(EntityTypeBuilder<AppUser> builder)
     {
+        builder.ConfigureByConvention();
+        
         builder.Property(x => x.Email).IsRequired().HasMaxLength(128);
         
         builder.Property(x => x.Name).IsRequired().HasMaxLength(256);
@@ -18,6 +21,8 @@ public class AppUserConfigurations : IEntityTypeConfiguration<AppUser>
         
         builder.Property(x => x.IsActive).IsRequired();
         
+        builder.HasAlternateKey(x => x.Email);
+        
         builder.HasOne(x => x.IdentityUser)
             .WithOne()
             .HasForeignKey<AppUser>(x => x.IdentityUserId)
@@ -26,13 +31,12 @@ public class AppUserConfigurations : IEntityTypeConfiguration<AppUser>
         builder.HasMany(x => x.SupportTickets)
             .WithOne(x => x.AppUser)
             .HasForeignKey(x => x.AppUserId)
-            .IsRequired();
+            .OnDelete(DeleteBehavior.NoAction);
         
-        
-        
-        
-        
-        
+        builder.HasMany(x => x.UserServicePlans)
+            .WithOne(x => x.AppUser)
+            .HasForeignKey(x => x.AppUserId)
+            .OnDelete(DeleteBehavior.NoAction);
         
         builder.ToTable("AppUsers");
     }

@@ -24,7 +24,7 @@ public class AppUser : FullAuditedEntity<Guid>
 
     public List<SupportTicket> SupportTickets { get; set; }
 
-    public List<ServicePlan> ServicePlans { get; set; }
+    public List<UserServicePlan> UserServicePlans { get; set; }
     
     
 }

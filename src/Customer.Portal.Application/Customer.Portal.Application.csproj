@@ -22,4 +22,12 @@
     <PackageReference Include="Volo.Abp.TenantManagement.Application" Version="9.1.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Services\AppUserServices\" />
+    <Folder Include="Services\ServicePlanServices\" />
+    <Folder Include="Services\SupportTicketServices\" />
+    <Folder Include="Services\TicketCommentServices\" />
+    <Folder Include="Services\UserServicePlanServices\" />
+  </ItemGroup>
+
 </Project>

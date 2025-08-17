@@ -8,12 +8,10 @@ namespace Customer.Portal.Entities;
 
 public class SupportTicket : FullAuditedAggregateRoot<Guid>
 {
-
     public Guid AppUserId { get; set; }
-
     public AppUser AppUser { get; set; }
     
-    public Guid SupportagentId { get; set; }
+    public Guid? SupportagentId { get; set; }
 
     public IdentityUser Supportagent { get; set; }
 

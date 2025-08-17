@@ -4,7 +4,7 @@ using Volo.Abp.Domain.Entities.Auditing;
 
 namespace Customer.Portal.Entities;
 
-public class ReportLog : FullAuditedEntity<Guid>
+public class Report : FullAuditedEntity<Guid>
 {
     public Guid ReportTemplateId { get; set; }
     

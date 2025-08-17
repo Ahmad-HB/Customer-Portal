@@ -1,3 +1,5 @@
+using Customer.Portal.Configurations;
+using Customer.Portal.Entities;
 using Microsoft.EntityFrameworkCore;
 using Volo.Abp.AuditLogging.EntityFrameworkCore;
 using Volo.Abp.BackgroundJobs.EntityFrameworkCore;
@@ -26,7 +28,22 @@ public class PortalDbContext :
     IIdentityDbContext
 {
     /* Add DbSet properties for your Aggregate Roots / Entities here. */
+    
+    
+    #region MyEntities
+    
+    public DbSet<ServicePlan> ServicePlans { get; set; }
+    
+    public DbSet<SupportTicket> SupportTickets { get; set; }
+    
+    public DbSet<TicketComment> TicketComments { get; set; }
+    
+    public DbSet<AppUser> AppUsers { get; set; }
 
+    public DbSet<UserServicePlan> UserServicePlans { get; set; }
+    
+    #endregion
+    
 
     #region Entities from the modules
 
@@ -80,6 +97,16 @@ public class PortalDbContext :
         builder.ConfigureBlobStoring();
         
         /* Configure your own tables/entities inside here */
+
+        #region MyRegion
+
+        builder.ApplyConfiguration(new ServicePlanConfigurations());
+        builder.ApplyConfiguration(new SupportTicketConfigurations());
+        builder.ApplyConfiguration(new TicketCommentConfigurations());
+        builder.ApplyConfiguration(new AppUserConfigurations());
+        builder.ApplyConfiguration(new UserServicePlanConfigurations());
+
+        #endregion
 
         //builder.Entity<YourEntity>(b =>
         //{

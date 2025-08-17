@@ -11,13 +11,13 @@ public class ServicePlanConfigurations : IEntityTypeConfiguration<ServicePlan>
     {
         builder.ConfigureByConvention();
 
+        builder.Property(x => x.Count);
+
         builder.Property(x => x.Name).IsRequired().HasMaxLength(256);
         
         builder.Property(x => x.Description).HasMaxLength(1024);
         
         builder.Property(x => x.Price).HasColumnType("decimal(18,2)");
-
-        builder.Property(x => x.IsActive).IsRequired();
         
         builder.ToTable("ServicePlans");
     }

@@ -4,7 +4,7 @@ using Volo.Abp.Identity;
 
 namespace Customer.Portal.Entities;
 
-public class EmailLog : FullAuditedEntity<Guid>
+public class Email : FullAuditedEntity<Guid>
 {
     public Guid UserId { get; set; }
 
