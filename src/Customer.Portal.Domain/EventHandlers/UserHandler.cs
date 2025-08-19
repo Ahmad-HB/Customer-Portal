@@ -44,10 +44,9 @@ public class UserHandler : ILocalEventHandler<EntityCreatedEventData<IdentityUse
 
     public async Task HandleEventAsync(EntityCreatedEventData<AppUser> eventData)
     {
-        // var appUser = eventData.Entity;
-        //
-        // await _appUserManager.Value.CompleteAppUserRegisterAsync(appUser.Id, appUser.UserType);
+        var appUser = eventData.Entity;
         
-        throw new NotImplementedException();
+        await _appUserManager.Value.CompleteAppUserRegisterAsync(appUser.Id, appUser.UserType);
+        
     }
 }

@@ -11,9 +11,6 @@ public interface IAppUserManager : IDomainService
 {
     public Task RegisterAppUserAsync (IdentityUser identityUser, Guid? tenantId);
     
-    public Task CompleteAppUserRegisterAsync(Guid AppUserId, UserType userType);
-    
-    
     
     
 }

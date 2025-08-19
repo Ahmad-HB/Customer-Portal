@@ -39,9 +39,12 @@ using Volo.Abp.TenantManagement.Web;
 using System;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
+using Customer.Portal.Services.AppUserServices;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Volo.Abp.Account;
 using Volo.Abp.Account.Web;
 using Volo.Abp.AspNetCore.Mvc.UI.Bundling;
 using Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared.Toolbars;
@@ -147,6 +150,8 @@ public class PortalWebModule : AbpModule
         ConfigureAutoApiControllers();
         ConfigureSwaggerServices(context.Services);
         ConfigureCors(context, configuration);
+        PortalDtoExtensions.Configure();
+        context.Services.Replace(ServiceDescriptor.Transient<IAccountAppService, CustomAccountAppService>());
 
         Configure<PermissionManagementOptions>(options =>
         {

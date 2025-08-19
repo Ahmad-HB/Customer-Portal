@@ -23,7 +23,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Services\AppUserServices\" />
     <Folder Include="Services\ServicePlanServices\" />
     <Folder Include="Services\SupportTicketServices\" />
     <Folder Include="Services\TicketCommentServices\" />
