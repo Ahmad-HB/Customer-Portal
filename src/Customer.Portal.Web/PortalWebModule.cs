@@ -39,6 +39,7 @@ using Volo.Abp.TenantManagement.Web;
 using System;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
+using Customer.Portal.FeaturesManagers.MAppUser;
 using Customer.Portal.Services.AppUserServices;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Cors;

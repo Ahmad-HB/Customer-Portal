@@ -29,7 +29,7 @@ public class SupportTicket : FullAuditedAggregateRoot<Guid>
     
     public string Description { get; set; }
     
-    public TicketPriority Priority { get; set; }
+    public TicketPriority? Priority { get; set; }
     
     public TicketStatus Status { get; set; }
     

@@ -22,8 +22,7 @@ public class SupportTicketConfigurations : IEntityTypeConfiguration<SupportTicke
         builder.Property(x => x.Status)
             .IsRequired();
 
-        builder.Property(x => x.Priority)
-            .IsRequired();
+        builder.Property(x => x.Priority);
 
         builder.Property(x => x.CreatedAt)
             .IsRequired()

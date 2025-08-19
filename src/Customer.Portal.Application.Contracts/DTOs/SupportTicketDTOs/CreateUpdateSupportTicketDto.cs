@@ -5,9 +5,12 @@ namespace Customer.Portal.DTOs.SupportTicketDTOs;
 
 public class CreateUpdateSupportTicketDto : EntityDto<Guid>
 {
-    public string Name { get; set; }
-
+    public Guid AppUserId { get; set; }
+    
+    public Guid ServicePlanId { get; set; }
+    
+    public string Subject { get; set; }
+    
     public string Description { get; set; }
-
-    public decimal Price { get; set; }
+    
 }

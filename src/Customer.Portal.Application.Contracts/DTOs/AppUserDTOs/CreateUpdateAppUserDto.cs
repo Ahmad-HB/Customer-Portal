@@ -5,9 +5,5 @@ namespace Customer.Portal.DTOs.AppUserDTOs;
 
 public class CreateUpdateAppUserDto : EntityDto<Guid>
 {
-    public string Name { get; set; }
-
-    public string Description { get; set; }
-
-    public decimal Price { get; set; }
+    
 }

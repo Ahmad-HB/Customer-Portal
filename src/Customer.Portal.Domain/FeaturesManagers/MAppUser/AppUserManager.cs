@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Customer.Portal.Entities;
 using Customer.Portal.Enums;
@@ -42,13 +43,20 @@ public class AppUserManager : DomainService, IAppUserManager
             identityUser.Id));
     }
 
+    public async Task<List<AppUser>> GetAllAppUsers()
+    {
+        var userList = await _appUserRepository.GetListAsync();
+
+        return userList;
+    }
+
+    public async Task<AppUser> GetUserByIdAsync(Guid id)
+    {
+        return await _appUserRepository.GetAsync(id);
+    }
+
     public Task CompleteAppUserRegisterAsync(Guid AppUserId, UserType userType)
     {
-        Console.WriteLine("nega");
-        // Here you can implement the logic to complete the registration of the AppUser
-        
-        // For example, you might want to update the AppUser's UserType or perform other actions.
-        
         return Task.CompletedTask;
     }
 
