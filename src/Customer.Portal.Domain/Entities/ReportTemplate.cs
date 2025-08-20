@@ -13,4 +13,16 @@ public class ReportTemplate : FullAuditedEntity<Guid>
     public string Name { get; set; }
     
     public string Format { get; set; }
+
+
+    public ReportTemplate(Guid id, TemplateType templateType, ReportTypes reportType, string name, string format) : base(id)
+    {
+        Id = id;
+        TemplateType = templateType;
+        ReportType = reportType;
+        Name = name;
+        Format = format;
+    }
+    
+    // EmailTemplateConfiguration
 }

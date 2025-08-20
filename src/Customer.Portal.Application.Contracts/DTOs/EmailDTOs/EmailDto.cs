@@ -1,14 +1,12 @@
 using System;
-using Volo.Abp.Domain.Entities.Auditing;
-using Volo.Abp.Identity;
+using Volo.Abp.Application.Dtos;
 
-namespace Customer.Portal.Entities;
+namespace Customer.Portal.DTOs.EmailDTOs;
 
-public class Email : FullAuditedEntity<Guid>
+public class EmailDto : FullAuditedEntityDto<Guid>
 {
     public Guid IdentityUserId { get; set; }
-
-    public IdentityUser IdentityUser { get; set; }
+    public string IdentityUserName { get; set; }
 
     public string EmailAddress { get; set; }
 

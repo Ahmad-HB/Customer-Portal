@@ -1,6 +1,8 @@
+using Volo.Abp.Domain.Services;
+
 namespace Customer.Portal.FeaturesManagers.MSupportTicket;
 
-public interface ISupportTicketManager
+public interface ISupportTicketManager : IDomainService
 {
     
 }

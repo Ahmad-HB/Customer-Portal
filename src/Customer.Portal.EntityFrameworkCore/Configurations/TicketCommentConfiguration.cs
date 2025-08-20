@@ -5,7 +5,7 @@ using Volo.Abp.EntityFrameworkCore.Modeling;
 
 namespace Customer.Portal.Configurations;
 
-public class TicketCommentConfigurations : IEntityTypeConfiguration<TicketComment>
+public class TicketCommentConfiguration : IEntityTypeConfiguration<TicketComment>
 {
     public void Configure(EntityTypeBuilder<TicketComment> builder)
     {

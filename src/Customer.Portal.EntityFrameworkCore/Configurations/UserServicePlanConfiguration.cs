@@ -5,7 +5,7 @@ using Volo.Abp.EntityFrameworkCore.Modeling;
 
 namespace Customer.Portal.Configurations;
 
-public class UserServicePlanConfigurations : IEntityTypeConfiguration<UserServicePlan>
+public class UserServicePlanConfiguration : IEntityTypeConfiguration<UserServicePlan>
 {
     public void Configure(EntityTypeBuilder<UserServicePlan> builder)
     {

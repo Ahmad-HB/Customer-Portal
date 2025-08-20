@@ -42,6 +42,14 @@ public class PortalDbContext :
 
     public DbSet<UserServicePlan> UserServicePlans { get; set; }
     
+    public DbSet<EmailTemplate> EmailTemplates { get; set; }
+    
+    public DbSet<ReportTemplate> ReportTemplates { get; set; }
+    
+    public DbSet<Report> Reports { get; set; }
+    
+    public DbSet<Email> Emails { get; set; }
+    
     #endregion
     
 
@@ -98,13 +106,18 @@ public class PortalDbContext :
         
         /* Configure your own tables/entities inside here */
 
-        #region MyRegion
+        
+        #region MyConfigurations
 
-        builder.ApplyConfiguration(new ServicePlanConfigurations());
-        builder.ApplyConfiguration(new SupportTicketConfigurations());
-        builder.ApplyConfiguration(new TicketCommentConfigurations());
-        builder.ApplyConfiguration(new AppUserConfigurations());
-        builder.ApplyConfiguration(new UserServicePlanConfigurations());
+        builder.ApplyConfiguration(new ServicePlanConfiguration());
+        builder.ApplyConfiguration(new SupportTicketConfiguration());
+        builder.ApplyConfiguration(new TicketCommentConfiguration());
+        builder.ApplyConfiguration(new AppUserConfiguration());
+        builder.ApplyConfiguration(new UserServicePlanConfiguration());
+        builder.ApplyConfiguration(new EmailTemplateConfiguration());
+        builder.ApplyConfiguration(new ReportTemplateConfiguration());
+        builder.ApplyConfiguration(new ReportConfiguration());
+        builder.ApplyConfiguration(new EmailConfiguration());
 
         #endregion
 

@@ -28,6 +28,7 @@ public class UserHandler : ILocalEventHandler<EntityCreatedEventData<IdentityUse
     private readonly Lazy<AppUserManager> _appUserManager;
     private readonly Lazy<OrganizationUnitManager> _organizationUnitManager;
     private readonly IRepository<OrganizationUnit, Guid> _organizationUnitRepository;
+    private readonly IRepository<IdentityRole, Guid> _identityRoleRepository;
 
 
     #endregion
@@ -35,13 +36,14 @@ public class UserHandler : ILocalEventHandler<EntityCreatedEventData<IdentityUse
 
     #region Ctor
 
-    public UserHandler(Lazy<IdentityUserManager> identityUserManager, Lazy<AppUserManager> appUserManager, Lazy<OrganizationUnitManager> organizationUnitManager, IRepository<OrganizationUnit, Guid> organizationUnitRepository, IRepository<IdentityUser, Guid> identityUserRepository)
+    public UserHandler(Lazy<IdentityUserManager> identityUserManager, Lazy<AppUserManager> appUserManager, Lazy<OrganizationUnitManager> organizationUnitManager, IRepository<OrganizationUnit, Guid> organizationUnitRepository, IRepository<IdentityUser, Guid> identityUserRepository, IRepository<IdentityRole, Guid> identityRoleRepository)
     {
         _identityUserManager = identityUserManager;
         _appUserManager = appUserManager;
         _organizationUnitManager = organizationUnitManager;
         _organizationUnitRepository = organizationUnitRepository;
         _identityUserRepository = identityUserRepository;
+        _identityRoleRepository = identityRoleRepository;
     }
 
     #endregion
@@ -69,7 +71,9 @@ public class UserHandler : ILocalEventHandler<EntityCreatedEventData<IdentityUse
         
         await query.Where(u => u.Id == identityUserId)
             .ExecuteUpdateAsync(u => 
-                u.SetProperty<Guid>(u => EF.Property<Guid>(u, "AppUserId"), appUser.Id));
+                u.SetProperty<Guid>(user => EF.Property<Guid>(user, "AppUserId"), appUser.Id));
+        
+        identityUser.AddRole(Guid.Parse("3a1bd314-4d03-fe19-9a6b-b33550f93128"));
         
         await _identityUserRepository.UpdateAsync(identityUser);
         

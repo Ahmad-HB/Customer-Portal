@@ -5,7 +5,7 @@ using Volo.Abp.EntityFrameworkCore.Modeling;
 
 namespace Customer.Portal.Configurations;
 
-public class AppUserConfigurations : IEntityTypeConfiguration<AppUser>
+public class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
 {
     public void Configure(EntityTypeBuilder<AppUser> builder)
     {

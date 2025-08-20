@@ -5,7 +5,7 @@ using Volo.Abp.EntityFrameworkCore.Modeling;
 
 namespace Customer.Portal.Configurations;
 
-public class SupportTicketConfigurations : IEntityTypeConfiguration<SupportTicket>
+public class SupportTicketConfiguration : IEntityTypeConfiguration<SupportTicket>
 {
     public void Configure(EntityTypeBuilder<SupportTicket> builder)
     {
