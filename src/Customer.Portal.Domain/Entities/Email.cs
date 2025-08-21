@@ -9,6 +9,10 @@ public class Email : FullAuditedEntity<Guid>
     public Guid IdentityUserId { get; set; }
 
     public IdentityUser IdentityUser { get; set; }
+    
+    public Guid EmailTemplateId { get; set; }
+    
+    public EmailTemplate EmailTemplate { get; set; }
 
     public string EmailAddress { get; set; }
 

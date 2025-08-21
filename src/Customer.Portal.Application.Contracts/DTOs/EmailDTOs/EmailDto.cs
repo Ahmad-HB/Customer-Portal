@@ -7,6 +7,9 @@ public class EmailDto : FullAuditedEntityDto<Guid>
 {
     public Guid IdentityUserId { get; set; }
     public string IdentityUserName { get; set; }
+    
+    public Guid EmailTemplateId { get; set; }
+    public string EmailTemplateName { get; set; }
 
     public string EmailAddress { get; set; }
 

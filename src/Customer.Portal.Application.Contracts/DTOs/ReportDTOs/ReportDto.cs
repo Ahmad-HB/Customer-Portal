@@ -14,8 +14,6 @@ public class ReportDto : FullAuditedEntityDto<Guid>
     
     public string ReportTemplateName { get; set; }
     
-    
-    
     public string Subject { get; set; }
     
     public string Content { get; set; }

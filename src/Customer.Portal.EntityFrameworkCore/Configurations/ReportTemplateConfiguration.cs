@@ -11,14 +11,12 @@ public class ReportTemplateConfiguration : IEntityTypeConfiguration<ReportTempla
     {
         
         builder.ConfigureByConvention();
-        
+
         builder.Property(x => x.TemplateType)
-            .IsRequired()
-            .HasConversion<string>();
-        
+            .IsRequired();
+
         builder.Property(x => x.ReportType)
-            .IsRequired()
-            .HasConversion<string>();
+            .IsRequired();
         
         builder.Property(x => x.Name)
             .IsRequired()

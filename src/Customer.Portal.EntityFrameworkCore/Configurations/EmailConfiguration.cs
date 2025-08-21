@@ -37,6 +37,11 @@ public class EmailConfiguration : IEntityTypeConfiguration<Email>
             .WithMany()
             .HasForeignKey(u => u.IdentityUserId)
             .OnDelete(DeleteBehavior.NoAction);
+        
+        builder.HasOne(x => x.EmailTemplate)
+            .WithMany()
+            .HasForeignKey(u => u.EmailTemplateId)
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.ToTable("Emails");
     }
