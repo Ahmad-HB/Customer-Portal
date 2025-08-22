@@ -3,7 +3,7 @@ using Volo.Abp.Application.Dtos;
 
 namespace Customer.Portal.DTOs.TicketCommentDTOs;
 
-public class CreateUpdateServicePlanDto : EntityDto<Guid>
+public class CreateUpdateTicketCommentDto : EntityDto<Guid>
 {
     public string Name { get; set; }
 

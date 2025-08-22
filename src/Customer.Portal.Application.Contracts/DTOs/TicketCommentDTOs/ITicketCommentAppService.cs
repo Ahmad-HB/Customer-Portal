@@ -2,7 +2,7 @@ using Volo.Abp.Application.Services;
 
 namespace Customer.Portal.DTOs.TicketCommentDTOs;
 
-public interface IServicePlanAppService : IApplicationService
+public interface ITicketCommentAppService : IApplicationService
 {
     
 }

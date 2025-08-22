@@ -3,7 +3,7 @@ using Volo.Abp.Application.Dtos;
 
 namespace Customer.Portal.DTOs.TicketCommentDTOs;
 
-public class ServicePlanDto : FullAuditedEntityDto<Guid>
+public class TicketCommentDto : FullAuditedEntityDto<Guid>
 {
     public Guid TicketId { get; set; }
     
