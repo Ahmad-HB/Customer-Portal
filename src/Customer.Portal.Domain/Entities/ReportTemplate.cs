@@ -24,5 +24,4 @@ public class ReportTemplate : FullAuditedEntity<Guid>
         Format = format;
     }
     
-    // EmailTemplateConfiguration
 }
