@@ -12,4 +12,13 @@ public class ServicePlan : FullAuditedEntity<Guid>
     public decimal Price { get; set; }
     
     public int Count { get; set; }
+
+
+    public ServicePlan(Guid Id, string name, string description, decimal price) : base(Id)
+    {
+        Id = Id;
+        Name = name;
+        Description = description;
+        Price = price;
+    }
 }

@@ -29,15 +29,13 @@ public class SupportTicketAppService : PortalAppService, ISupportTicketAppServic
 
     #region Methods
 
-    public async Task<Task> CreateSupportTicketAsync(CreateUpdateSupportTicketDto input)
+    public async Task CreateSupportTicketAsync(CreateUpdateSupportTicketDto input)
     {
         var supportTicket = ObjectMapper.Map<CreateUpdateSupportTicketDto, SupportTicket>(input);
         
         Guid identityUserId = _currentUser.Id ?? throw new UserFriendlyException("User is not logged in.");
         
         await _supportTicketManager.CreateSupportTicketAsync(supportTicket, identityUserId);
-        
-        return Task.CompletedTask;
     }
 
     #endregion

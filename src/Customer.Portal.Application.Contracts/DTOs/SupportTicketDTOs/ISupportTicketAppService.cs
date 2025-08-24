@@ -5,5 +5,5 @@ namespace Customer.Portal.DTOs.SupportTicketDTOs;
 
 public interface ISupportTicketAppService : IApplicationService
 {
-    public Task<Task> CreateSupportTicketAsync(CreateUpdateSupportTicketDto input);
+    public Task CreateSupportTicketAsync(CreateUpdateSupportTicketDto input);
 }

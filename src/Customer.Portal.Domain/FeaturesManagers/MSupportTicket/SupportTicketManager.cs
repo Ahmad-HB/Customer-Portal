@@ -35,7 +35,7 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
 
 
     #region Methods
-
+    
     public async Task CreateSupportTicketAsync(SupportTicket supportTicket, Guid identityUserId)
     {
         var query = await _identityUserRepository.GetQueryableAsync();
@@ -47,7 +47,6 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
             .FirstOrDefaultAsync();
 
         supportTicket.AppUserId = appUserId;
-        
         supportTicket.Status = TicketStatus.Open;
         supportTicket.CreatedAt = DateTime.UtcNow;
 
