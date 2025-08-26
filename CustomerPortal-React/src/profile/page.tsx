@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,39 @@ export default function ProfilePage() {
     address: "",
   })
 
+  const [originalData, setOriginalData] = useState({
+    name: "",
+    surname: "",
+    username: "",
+    email: "",
+    phone: "",
+    address: "",
+  })
+
+  const [hasChanges, setHasChanges] = useState(false)
+
+  // Initialize with sample data (in real app, this would come from API)
+  useEffect(() => {
+    const initialData = {
+      name: "John",
+      surname: "Doe",
+      username: "johndoe",
+      email: "john.doe@example.com",
+      phone: "+1 234 567 8900",
+      address: "123 Main St, City, State 12345",
+    }
+    setFormData(initialData)
+    setOriginalData(initialData)
+  }, [])
+
+  // Check for changes whenever formData changes
+  useEffect(() => {
+    const changed = Object.keys(formData).some(key => 
+      formData[key as keyof typeof formData] !== originalData[key as keyof typeof originalData]
+    )
+    setHasChanges(changed)
+  }, [formData, originalData])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
       ...prev,
@@ -30,10 +63,15 @@ export default function ProfilePage() {
 
   const handleEdit = () => {
     console.log("Edit profile:", formData)
+    // In real app, this would save to API
+    setOriginalData(formData)
+    setHasChanges(false)
   }
 
   const handleCancel = () => {
     console.log("Cancel changes")
+    setFormData(originalData)
+    setHasChanges(false)
   }
 
   // Sample data for tickets
@@ -146,6 +184,27 @@ export default function ProfilePage() {
               />
             </div>
           </div>
+
+          {/* Action Buttons - Only show when there are changes, positioned under form fields */}
+          {hasChanges && (
+            <div className="flex gap-3 pt-2">
+              <Button
+                onClick={handleEdit}
+                size="sm"
+                className="rounded-full bg-green-500 hover:bg-green-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+              >
+                Save Changes
+              </Button>
+              <Button
+                onClick={handleCancel}
+                variant="destructive"
+                size="sm"
+                className="rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -227,23 +286,6 @@ export default function ProfilePage() {
             </div>
           </TabsContent>
         </Tabs>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="mt-8 flex gap-4">
-        <Button
-          onClick={handleEdit}
-          className="flex-1 rounded-full bg-green-500 hover:bg-green-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
-        >
-          Edit
-        </Button>
-        <Button
-          onClick={handleCancel}
-          variant="destructive"
-          className="flex-1 rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
-        >
-          Cancel
-        </Button>
       </div>
     </div>
   )
