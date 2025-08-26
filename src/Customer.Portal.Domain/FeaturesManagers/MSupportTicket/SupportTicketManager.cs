@@ -9,6 +9,7 @@ using Volo.Abp;
 using Volo.Abp.Data;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Domain.Services;
+using Volo.Abp.Guids;
 using Volo.Abp.Identity;
 
 namespace Customer.Portal.FeaturesManagers.MSupportTicket;
@@ -19,16 +20,18 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
 
     private readonly IRepository<SupportTicket, Guid> _supportTicketRepository;
     private readonly IRepository<IdentityUser, Guid> _identityUserRepository;
+    private readonly IGuidGenerator _guidGenerator;
 
     #endregion
 
     #region Ctor
 
     public SupportTicketManager(IRepository<SupportTicket, Guid> supportTicketRepository,
-        IRepository<IdentityUser, Guid> userRepository)
+        IRepository<IdentityUser, Guid> userRepository, IGuidGenerator guidGenerator)
     {
         _supportTicketRepository = supportTicketRepository;
         _identityUserRepository = userRepository;
+        _guidGenerator = guidGenerator;
     }
 
     #endregion
@@ -45,7 +48,7 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
             .Where(u => u.Id == identityUserId)
             .Select(u => EF.Property<Guid>(u, "AppUserId"))
             .FirstOrDefaultAsync();
-
+        
         supportTicket.AppUserId = appUserId;
         supportTicket.Status = TicketStatus.Open;
         supportTicket.CreatedAt = DateTime.UtcNow;
