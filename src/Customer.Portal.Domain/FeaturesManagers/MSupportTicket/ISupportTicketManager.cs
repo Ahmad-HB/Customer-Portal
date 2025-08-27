@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Customer.Portal.Entities;
+using Customer.Portal.Enums;
 using Volo.Abp.Domain.Services;
 
 namespace Customer.Portal.FeaturesManagers.MSupportTicket;
@@ -12,22 +13,22 @@ public interface ISupportTicketManager : IDomainService
     
     public Task<SupportTicket> GetSupportTicketByIdAsync(Guid supportTicketId);
     
-    public Task<List<SupportTicket>> GetSupportTicketsAsync();
+    public Task<List<SupportTicket>> GetSupportTicketsAsync(Guid identityUserId);
     
     public Task DeleteSupportTicketAsync(Guid supportTicketId);
     
-    public Task AssignSupportAgentAsync(Guid supportTicketId, Guid supportAgentId);
+    public Task AssignSupportAgentAsync(Guid supportTicketId);
     
     public Task AssignTechnicianAsync(Guid supportTicketId, Guid technicianId);
     
-    public Task UpdateTicketStatusAsync(Guid supportTicketId, string status);
+    public Task UpdateTicketStatusAsync(Guid supportTicketId, TicketStatus status);
     
-    public Task UpdateTicketPriorityAsync(Guid supportTicketId, string priority);
+    public Task UpdateTicketPriorityAsync(Guid supportTicketId, TicketPriority priority);
     
-    public Task AddCommentToTicketAsync(Guid supportTicketId, Guid appUserId, string comment);
+    public Task AddCommentToTicketAsync(Guid supportTicketId, string comment, Guid userId);
     
-    public Task NotifyUserOnTicketUpdateAsync(Guid supportTicketId, string updateType);
+    public Task NotifyUserOnTicketUpdateAsync(Guid supportTicketId, UpdateType updateType);
     
-    public Task RemoveCommentFromTicketAsync(Guid supportTicketId, Guid appUserId, string comment);
+    public Task RemoveCommentFromTicketAsync(Guid supportTicketId, Guid ticketCommentId);
     
 }
