@@ -15,4 +15,12 @@ public class Report : FullAuditedEntity<Guid>
     public string Content { get; set; }
     
     public DateTime GeneratedAt { get; set; }
+
+    public Report(Guid id, Guid reportTemplateId, string subject, string content, DateTime generatedAt) : base(id)
+    {
+        ReportTemplateId = reportTemplateId;
+        Subject = subject;
+        Content = content;
+        GeneratedAt = generatedAt;
+    }
 }

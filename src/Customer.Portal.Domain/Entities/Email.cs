@@ -25,4 +25,17 @@ public class Email : FullAuditedEntity<Guid>
     public bool IsSuccess { get; set; }
 
     public string ErrorMessage { get; set; }
+
+
+    public Email(Guid id, Guid identityUserId, Guid emailTemplateId, string emailAddress, string subject, string body, DateTime sentAt, bool isSuccess)
+        : base(id)
+    {
+        IdentityUserId = identityUserId;
+        EmailTemplateId = emailTemplateId;
+        EmailAddress = emailAddress;
+        Subject = subject;
+        Body = body;
+        SentAt = sentAt;
+        IsSuccess = isSuccess;
+    }
 }

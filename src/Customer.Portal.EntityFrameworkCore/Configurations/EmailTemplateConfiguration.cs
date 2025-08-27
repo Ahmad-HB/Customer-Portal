@@ -18,16 +18,14 @@ public class EmailTemplateConfiguration : IEntityTypeConfiguration<EmailTemplate
 
         builder.Property(x => x.EmailType)
             .IsRequired();
-        
-        
+
+
         builder.Property(x => x.Name)
-            .IsRequired()
-            .HasMaxLength(256);
-        
-        
+            .IsRequired();
+
+
         builder.Property(x => x.Format)
-            .IsRequired()
-            .HasMaxLength(256);
+            .IsRequired();
         
         builder.ToTable("EmailTemplates");
     }

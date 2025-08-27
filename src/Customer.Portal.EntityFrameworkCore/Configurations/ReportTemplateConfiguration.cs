@@ -17,14 +17,12 @@ public class ReportTemplateConfiguration : IEntityTypeConfiguration<ReportTempla
 
         builder.Property(x => x.ReportType)
             .IsRequired();
-        
+
         builder.Property(x => x.Name)
-            .IsRequired()
-            .HasMaxLength(256);
-        
+            .IsRequired();
+
         builder.Property(x => x.Format)
-            .IsRequired()
-            .HasMaxLength(256);
+            .IsRequired();
         
         
         
