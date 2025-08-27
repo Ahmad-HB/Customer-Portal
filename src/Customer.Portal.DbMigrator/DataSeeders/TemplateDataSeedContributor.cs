@@ -31,6 +31,7 @@ public class TemplateDataSeedContributor : IDataSeedContributor, ITransientDepen
     {
         // await SeedEmailTemplatesAsync();
         // await SeedReportTemplatesAsync();
+        return;
         
     }
 

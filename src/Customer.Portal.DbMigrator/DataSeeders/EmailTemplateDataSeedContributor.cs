@@ -31,6 +31,6 @@ public class EmailTemplateDataSeedContributor : IDataSeedContributor, ITransient
     
     public Task SeedAsync(DataSeedContext context)
     {
-        throw new System.NotImplementedException();
+        return Task.CompletedTask;
     }
 }

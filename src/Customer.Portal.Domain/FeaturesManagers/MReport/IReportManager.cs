@@ -9,13 +9,13 @@ namespace Customer.Portal.FeaturesManagers.MReport;
 
 public interface IReportManager : IDomainService
 {
-    public Task GenerateSupportAgentReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId);
+    public Task<Byte[]> GenerateSupportAgentReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId);
     
-    public Task GenerateSupportAgentWithTechnicianReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId);
+    public Task<Byte[]> GenerateSupportAgentWithTechnicianReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId);
     
-    public Task GenerateTechnicianReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId);
+    public Task<Byte[]> GenerateTechnicianReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId);
     
-    public Task GenerateMonthlySummaryReportAsync(ReportTypes reportType, DateTime startDate, DateTime endDate);
+    public Task<Byte[]> GenerateMonthlySummaryReportAsync(ReportTypes reportType, DateTime startDate, DateTime endDate);
     
     
     

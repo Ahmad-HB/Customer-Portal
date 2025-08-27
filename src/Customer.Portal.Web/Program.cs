@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using QuestPDF.Infrastructure;
 using Serilog;
 using Serilog.Events;
 
@@ -12,6 +13,7 @@ public class Program
 {
     public async static Task<int> Main(string[] args)
     {
+        QuestPDF.Settings.License = LicenseType.Community;
         Log.Logger = new LoggerConfiguration()
             .WriteTo.Async(c => c.File("Logs/logs.txt"))
             .WriteTo.Async(c => c.Console())

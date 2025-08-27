@@ -34,10 +34,10 @@ public class ReportTemplateDataSeedContributor : IDataSeedContributor, ITransien
 
     public async Task SeedAsync(DataSeedContext context)
     {
-        // if (await _reportTemplateRepository.GetCountAsync() > 0)
-        // {
-        //     return;
-        // }
+        if (await _reportTemplateRepository.GetCountAsync() > 0)
+        {
+            return;
+        }
         //
         //
         // var reportTemplates = new List<ReportTemplate>
@@ -73,5 +73,24 @@ public class ReportTemplateDataSeedContributor : IDataSeedContributor, ITransien
         // };
         //
         // await _reportTemplateRepository.InsertManyAsync(reportTemplates);
+
+        await _reportTemplateRepository
+            .InsertAsync(new ReportTemplate
+            (
+                _guidGenerator.Create(),
+                TemplateType.Report,
+                ReportTypes.MonthlySummaryReport,
+                "Monthly Summary Report",
+                @"
+                <h1>Monthly Summary Report</h1>
+                <p>Report Period: {{StartDate}} to {{EndDate}}</p>
+                <ul>
+                    <li>Total Tickets: {{TotalTickets}}</li>
+                    <li>Resolved Tickets: {{ResolvedTickets}}</li>
+                    <li>In Progress Tickets: {{InProgressTickets}}</li>
+                    <li>Closed Tickets: {{ClosedTickets}}</li>
+                </ul>
+                <p>Generated At: {{Now}}</p>"
+            ));
     }
 }

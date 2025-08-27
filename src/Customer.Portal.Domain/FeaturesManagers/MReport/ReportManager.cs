@@ -5,19 +5,26 @@ using System.Threading.Tasks;
 using Customer.Portal.Entities;
 using Customer.Portal.Enums;
 using Microsoft.Extensions.Logging;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
+using Scriban;
 using Volo.Abp;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Domain.Services;
 using Volo.Abp.Guids;
 using Volo.Abp.Identity;
 using Volo.Abp.TextTemplating;
+using Volo.Abp.Uow;
+
 
 namespace Customer.Portal.FeaturesManagers.MReport;
 
 public class ReportManager : DomainService, IReportManager
 {
+    
     #region Fields
-
+    
     private readonly IRepository<Report, Guid> _reportRepository;
     private readonly IRepository<IdentityUser, Guid> _identityUserRepository;
     private readonly IRepository<ReportTemplate, Guid> _reportTemplateRepository;
@@ -27,6 +34,8 @@ public class ReportManager : DomainService, IReportManager
     private readonly ITemplateRenderer _templateRenderer;
     private readonly IGuidGenerator _guidGenerator;
     private readonly ILogger<ReportManager> _logger;
+    private readonly IUnitOfWorkManager _unitOfWorkManager;
+    private readonly IUnitOfWork _unitOfWork;
 
     #endregion
 
@@ -40,7 +49,7 @@ public class ReportManager : DomainService, IReportManager
         IRepository<Email, Guid> emailRepository,
         ITemplateRenderer templateRenderer,
         IGuidGenerator guidGenerator,
-        ILogger<ReportManager> logger, IRepository<IdentityUser, Guid> identityUserRepository)
+        ILogger<ReportManager> logger, IRepository<IdentityUser, Guid> identityUserRepository, IUnitOfWorkManager unitOfWorkManager, IUnitOfWork unitOfWork)
     {
         _reportRepository = reportRepository;
         _reportTemplateRepository = reportTemplateRepository;
@@ -51,13 +60,15 @@ public class ReportManager : DomainService, IReportManager
         _guidGenerator = guidGenerator;
         _logger = logger;
         _identityUserRepository = identityUserRepository;
+        _unitOfWorkManager = unitOfWorkManager;
+        _unitOfWork = unitOfWork;
     }
 
     #endregion
 
     #region Methods
 
-    public async Task GenerateSupportAgentReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId)
+    public async Task<Byte[]> GenerateSupportAgentReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId)
     {
         var reportTemplate = await _reportTemplateRepository.FirstOrDefaultAsync(rt => rt.ReportType == reportType);
         if (reportTemplate == null)
@@ -104,9 +115,12 @@ public class ReportManager : DomainService, IReportManager
         );
         await _reportRepository.InsertAsync(report);
         
+        var pdf = await GeneratePdfReportAsync(report);
+        return pdf;
+        
     }
 
-    public async Task GenerateSupportAgentWithTechnicianReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId)
+    public async Task<Byte[]> GenerateSupportAgentWithTechnicianReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId)
     {
         var reportTemplate = await _reportTemplateRepository.FirstOrDefaultAsync(rt => rt.ReportType == reportType);
         if (reportTemplate == null)
@@ -151,9 +165,12 @@ public class ReportManager : DomainService, IReportManager
             DateTime.UtcNow
         );
         await _reportRepository.InsertAsync(report);
+        
+        var pdf = await GeneratePdfReportAsync(report);
+        return pdf;
     }
 
-    public async Task GenerateTechnicianReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId)
+    public async Task<Byte[]> GenerateTechnicianReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId)
     {
         var reportTemplate = await _reportTemplateRepository.FirstOrDefaultAsync(rt => rt.ReportType == reportType);
         if (reportTemplate == null)
@@ -196,10 +213,13 @@ public class ReportManager : DomainService, IReportManager
         );
         
         await _reportRepository.InsertAsync(report);
+        
+        var pdf = await GeneratePdfReportAsync(report);
+        return pdf;
 
     }
 
-    public async Task GenerateMonthlySummaryReportAsync(ReportTypes reportType, DateTime startDate, DateTime endDate)
+    public async Task<Byte[]> GenerateMonthlySummaryReportAsync(ReportTypes reportType, DateTime startDate, DateTime endDate)
     {
         var reportTemplate = await _reportTemplateRepository.FirstOrDefaultAsync(rt => rt.ReportType == reportType);
         if (reportTemplate == null)
@@ -222,10 +242,14 @@ public class ReportManager : DomainService, IReportManager
             ClosedTickets = closedTickets
         };
         
-        var reportContent = await _templateRenderer.RenderAsync(
-            reportTemplate.Format,
-            templateData
-        );
+        var scribanTemplate = Template.Parse(reportTemplate.Format);
+        var reportContent = scribanTemplate.Render(templateData, member => member.Name);
+
+        
+        // var reportContent = await _templateRenderer.RenderAsync(
+        //     reportTemplate.Format,
+        //     templateData
+        // );
         
         var report = new Report(
             _guidGenerator.Create(),
@@ -236,9 +260,68 @@ public class ReportManager : DomainService, IReportManager
         );
         
         await _reportRepository.InsertAsync(report);
+
+        await _unitOfWork.SaveChangesAsync();
         
+        var pdf = await GeneratePdfReportAsync(report);
+        return pdf;
+        
+    }
+    
+    public async Task<Byte[]> GeneratePdfReportAsync(Report report)
+    {
+        // var report = await _reportRepository.FirstOrDefaultAsync(r => r.Id == );
+        // if (report == null)
+        // {
+        //     throw new UserFriendlyException($"No report found with ID: {report.Id}");
+        // }
+
+        try
+        {
+            var pdfBytes = QuestPDF.Fluent.Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(2, Unit.Centimetre);
+                    page.PageColor(Colors.White);
+                    page.DefaultTextStyle(x => x.FontSize(12));
+
+                    page.Header()
+                        .Text(report.Subject)
+                        .SemiBold().FontSize(20).FontColor(Colors.Blue.Medium);
+
+                    page.Content()
+                        .PaddingVertical(1, Unit.Centimetre)
+                        .Column(col =>
+                        {
+                            foreach (var line in report.Content.Split('\n'))
+                            {
+                                col.Item().Text(line);
+                            }
+                        });
+
+                    page.Footer()
+                        .AlignCenter()
+                        .Text(x =>
+                        {
+                            x.Span("Generated on ");
+                            x.Span(DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")).SemiBold();
+                        });
+                });
+            }).GeneratePdf();
+
+            return pdfBytes;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating PDF for report ID: {ReportId}", report.Id);
+            throw new UserFriendlyException("An error occurred while generating the PDF report.");
+        }
     }
 
     #endregion
+    
+    
     
 }

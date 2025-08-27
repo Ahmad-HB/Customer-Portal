@@ -34,37 +34,39 @@ public class ServicePlanDataSeedContributor : IDataSeedContributor, ITransientDe
 
     public async Task SeedAsync(DataSeedContext context)
     {
-        if (_servicePlanRepository.CountAsync().Result > 0)
-        {
-            return;
-        }
-
-        var servicePlans = new List<ServicePlan>
-        {
-            new ServicePlan
-            (
-                _guidGenerator.Create(),
-                "Basic",
-                "Basic Service Plan",
-                new decimal(9.99)
-            ),
-            new ServicePlan
-            (
-                _guidGenerator.Create(),
-                "Standard",
-                "Standard Service Plan",
-                new decimal(19.99)
-            ),
-            new ServicePlan
-            (
-                _guidGenerator.Create(),
-                "Premium",
-                "Premium Service Plan",
-                new decimal(29.99)
-            )
-        };
+        // if (_servicePlanRepository.CountAsync().Result > 0)
+        // {
+        //     return;
+        // }
+        //
+        // var servicePlans = new List<ServicePlan>
+        // {
+        //     new ServicePlan
+        //     (
+        //         _guidGenerator.Create(),
+        //         "Basic",
+        //         "Basic Service Plan",
+        //         new decimal(9.99)
+        //     ),
+        //     new ServicePlan
+        //     (
+        //         _guidGenerator.Create(),
+        //         "Standard",
+        //         "Standard Service Plan",
+        //         new decimal(19.99)
+        //     ),
+        //     new ServicePlan
+        //     (
+        //         _guidGenerator.Create(),
+        //         "Premium",
+        //         "Premium Service Plan",
+        //         new decimal(29.99)
+        //     )
+        // };
+        //
+        // await _servicePlanRepository.InsertManyAsync(servicePlans);
         
-        await _servicePlanRepository.InsertManyAsync(servicePlans);
+        return;
 
 
     }
