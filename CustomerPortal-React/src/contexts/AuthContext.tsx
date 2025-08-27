@@ -7,7 +7,7 @@ interface AuthContextType {
   isLoading: boolean
   login: (usernameOrEmail: string, password: string, rememberMe?: boolean) => Promise<boolean>
   register: (userData: RegisterRequest) => Promise<boolean>
-  logout: () => void
+  logout: () => Promise<void>
   updateUser: (userData: Partial<User>) => Promise<boolean>
 }
 
@@ -165,15 +165,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await apiClient.logout()
+      console.log('Starting logout process...')
+      
+      // Clear user state first to prevent any UI issues
       setUser(null)
-      // Redirect to login page
-      window.location.href = '/login'
+      
+      // Call the API logout
+      await apiClient.logout()
+      
+      console.log('Logout completed successfully')
+      
+      // Use a small delay to ensure all cleanup is done before redirect
+      setTimeout(() => {
+        window.location.href = '/login'
+      }, 100)
+      
     } catch (error) {
       console.error('Logout failed:', error)
-      // Even if logout fails, clear local state and redirect
-      setUser(null)
-      window.location.href = '/login'
+      // Even if logout fails, ensure we redirect
+      setTimeout(() => {
+        window.location.href = '/login'
+      }, 100)
     }
   }
 

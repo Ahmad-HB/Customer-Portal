@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Customer.Portal.Entities;
 using Customer.Portal.Enums;
+using Customer.Portal.FeaturesManagers.MTicketComment;
 using Microsoft.EntityFrameworkCore;
 using Volo.Abp;
 using Volo.Abp.Data;
@@ -25,6 +26,7 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
     private readonly IRepository<IdentityUserRole> _identityUserRoleRepository;
     private readonly IRepository<AppUser, Guid> _appUserRepository;
     private readonly IGuidGenerator _guidGenerator;
+    private readonly ITicketCommentManager _ticketCommentManager;
 
     #endregion
 
@@ -33,7 +35,8 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
     public SupportTicketManager(IRepository<SupportTicket, Guid> supportTicketRepository,
         IRepository<IdentityUser, Guid> userRepository, IGuidGenerator guidGenerator,
         IRepository<IdentityRole, Guid> identityRoleRepository,
-        IRepository<IdentityUserRole> identityUserRoleRepository, IRepository<AppUser, Guid> appUserRepository)
+        IRepository<IdentityUserRole> identityUserRoleRepository, IRepository<AppUser, Guid> appUserRepository,
+        ITicketCommentManager ticketCommentManager)
     {
         _supportTicketRepository = supportTicketRepository;
         _identityUserRepository = userRepository;
@@ -41,10 +44,11 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
         _identityRoleRepository = identityRoleRepository;
         _identityUserRoleRepository = identityUserRoleRepository;
         _appUserRepository = appUserRepository;
+        _ticketCommentManager = ticketCommentManager;
     }
 
     #endregion
-    
+
     #region Methods
 
     public async Task CreateSupportTicketAsync(SupportTicket supportTicket, Guid identityUserId)
@@ -103,11 +107,12 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
         {
             return await _supportTicketRepository.GetListAsync();
         }
+
         if (appUser.UserType == UserType.Technician)
         {
             return await _supportTicketRepository.GetListAsync(x => x.TechnicianId == appUserId);
         }
-        
+
         if (appUser.UserType == UserType.SupportAgent)
         {
             return await _supportTicketRepository.GetListAsync(x => x.SupportagentId == appUserId);
@@ -221,7 +226,15 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
             throw new UserFriendlyException("Support ticket not found.");
         }
 
-        var ticketComment = new TicketComment(_guidGenerator.Create(),supportTicketId, userId, comment, DateTime.Now);
+        await _ticketCommentManager.CreateTicketCommentAsync(new TicketComment(
+            _guidGenerator.Create(),
+            supportTicketId,
+            userId,
+            comment,
+            DateTime.UtcNow
+        ));
+        
+        var ticketComment = await _ticketCommentManager.GetTicketCommentAsync(supportTicketId);
 
         supportTicket.TicketComments ??= new List<TicketComment>();
         supportTicket.TicketComments.Add(ticketComment);
@@ -258,6 +271,7 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
         {
             throw new UserFriendlyException("This Ticket has no comments.");
         }
+
         await _supportTicketRepository.UpdateAsync(supportTicket);
 
         // Notify the user about the comment removal

@@ -13,6 +13,7 @@ import TechnicianAssignedTicketsPage from './technician/assigned-tickets/page'
 
 // Import components
 import { SidebarNav } from './components/sidebar-nav'
+import { LogoutTest } from './components/logout-test'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { LoadingOverlay } from '@/components/ui/loading-spinner'
@@ -89,6 +90,15 @@ function App() {
                         <Link to="/plans">
                           <Button className="w-full">View Plans</Button>
                         </Link>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Logout Test</CardTitle>
+                        <CardDescription>Test the logout functionality</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <LogoutTest />
                       </CardContent>
                     </Card>
                   </div>

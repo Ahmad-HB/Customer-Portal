@@ -292,26 +292,38 @@ class ApiClient {
 
   async logout(): Promise<void> {
     try {
+      console.log('Calling logout API endpoint:', `${this.baseURL}/api/account/logout`)
+      
       // Call the ABP.IO logout endpoint
       const response = await fetch(`${this.baseURL}/api/account/logout`, {
-        method: 'POST',
+        method: 'GET',
         headers: { 
-          'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
         credentials: 'include' // Include cookies for session-based auth
       })
 
       console.log('Logout response status:', response.status)
+      console.log('Logout response headers:', response.headers)
       
       if (response.ok) {
-        console.log('Logout successful')
+        console.log('Logout API call successful')
       } else {
-        console.log('Logout failed with status:', response.status)
+        console.log('Logout API call failed with status:', response.status)
+        
+        // Try to get error details
+        try {
+          const errorText = await response.text()
+          console.log('Logout error response:', errorText)
+        } catch (textError) {
+          console.log('Could not read error response text')
+        }
       }
     } catch (error) {
       console.error('Logout request failed:', error)
     } finally {
+      console.log('Clearing local storage and session data...')
+      
       // Always clear local state regardless of API response
       this.token = null
       localStorage.removeItem('access_token')
@@ -319,6 +331,15 @@ class ApiClient {
       localStorage.removeItem('demo_token')
       localStorage.removeItem('remember_me')
       localStorage.removeItem('remembered_user')
+      
+      // Clear any other potential auth-related items
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('token_expires')
+      
+      // Clear session storage as well
+      sessionStorage.clear()
+      
+      console.log('Local storage and session cleared successfully')
     }
   }
 

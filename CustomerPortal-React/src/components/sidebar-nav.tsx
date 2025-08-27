@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from "react-router-dom"
+import { Link, useLocation } from "react-router-dom"
 import { useAuth } from '@/contexts/AuthContext'
 import { 
   Home, 
@@ -52,7 +52,6 @@ const profileLinksByRole = {
 
 export function SidebarNav() {
   const location = useLocation()
-  const navigate = useNavigate()
   const { logout } = useAuth()
 
   // TODO: This should come from your authentication context/API
@@ -69,9 +68,9 @@ export function SidebarNav() {
   const navigation = navigationByRole[currentRole]
   const profileLink = profileLinksByRole[currentRole]
 
-  const handleLogout = () => {
-    logout()
-    navigate("/login")
+  const handleLogout = async () => {
+    await logout()
+    // logout() already handles navigation, so we don't need to navigate here
   }
 
   return (
