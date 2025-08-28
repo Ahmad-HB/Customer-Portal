@@ -18,6 +18,7 @@ using Volo.Abp.FeatureManagement;
 using Volo.Abp.Identity;
 using Volo.Abp.TenantManagement;
 using Volo.Abp.TextTemplating.Scriban;
+using Volo.Abp.VirtualFileSystem;
 
 namespace Customer.Portal;
 
@@ -66,6 +67,12 @@ public class PortalDomainModule : AbpModule
             options.Languages.Add(new LanguageInfo("de-DE", "de-DE", "Deutsch"));
             options.Languages.Add(new LanguageInfo("es", "es", "Español"));
             options.Languages.Add(new LanguageInfo("sv", "sv", "Svenska"));
+        });
+
+        // Configure Virtual File System to include template files
+        Configure<AbpVirtualFileSystemOptions>(options =>
+        {
+            options.FileSets.AddEmbedded<PortalDomainModule>("Customer.Portal");
         });
         
 

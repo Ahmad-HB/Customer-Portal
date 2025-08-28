@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Customer.Portal.Entities;
 using Customer.Portal.Enums;
 using Microsoft.Extensions.Logging;
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
+using PuppeteerSharp;
 using Scriban;
 using Volo.Abp;
 using Volo.Abp.Domain.Repositories;
@@ -101,7 +100,7 @@ public class ReportManager : DomainService, IReportManager
         };
         
         var reportContent = await _templateRenderer.RenderAsync(
-            reportTemplate.Format,
+            "SupportAgentReport",
             templateData
         );
         
@@ -153,7 +152,7 @@ public class ReportManager : DomainService, IReportManager
         };
         
         var reportContent = await _templateRenderer.RenderAsync(
-            reportTemplate.Format,
+            "SupportAgentWithTechnicianReport",
             templateData
         );
         
@@ -200,7 +199,7 @@ public class ReportManager : DomainService, IReportManager
         };
         
         var reportContent = await _templateRenderer.RenderAsync(
-            reportTemplate.Format,
+            "TechnicianReport",
             templateData
         );
         
@@ -221,8 +220,8 @@ public class ReportManager : DomainService, IReportManager
 
     public async Task<Byte[]> GenerateMonthlySummaryReportAsync(ReportTypes reportType, DateTime startDate, DateTime endDate)
     {
-        var reportTemplate = await _reportTemplateRepository.FirstOrDefaultAsync(rt => rt.ReportType == reportType);
-        if (reportTemplate == null)
+        var reportTemplate2 = await _reportTemplateRepository.FirstOrDefaultAsync(rt => rt.ReportType == reportType);
+        if (reportTemplate2 == null)
         {
             throw new UserFriendlyException($"No report template found for report type: {reportType}");
         }
@@ -234,27 +233,31 @@ public class ReportManager : DomainService, IReportManager
         
         var templateData = new
         {
-            StartDate = startDate.ToString("yyyy-MM-dd"),
-            EndDate = endDate.ToString("yyyy-MM-dd"),
-            TotalTickets = totalTickets.Count,
-            ResolvedTickets = resolvedTickets,
-            InProgressTickets = inProgressTickets,
-            ClosedTickets = closedTickets
+            start_date = startDate.ToString("yyyy-MM-dd"),
+            end_date = endDate.ToString("yyyy-MM-dd"),
+            total_tickets = totalTickets.Count,
+            resolved_tickets = resolvedTickets,
+            in_progress_tickets = inProgressTickets,
+            closed_tickets = closedTickets
         };
         
-        var scribanTemplate = Template.Parse(reportTemplate.Format);
-        var reportContent = scribanTemplate.Render(templateData, member => member.Name);
-
+        // string reportTemplate = await File.ReadAllTextAsync("MonthlySummaryReport.tpl");
         
-        // var reportContent = await _templateRenderer.RenderAsync(
-        //     reportTemplate.Format,
-        //     templateData
-        // );
+        
+        // var template = Template.Parse(reportTemplate);
+        
+        // var reportContent = template.Render(templateData);
+        
+        // Use ABP's ITemplateRenderer
+        var reportContent = await _templateRenderer.RenderAsync(
+            "MonthlySummaryReport",
+            templateData
+        );
         
         var report = new Report(
             _guidGenerator.Create(),
-            reportTemplate.Id,
-            reportTemplate.Name,
+            reportTemplate2.Id,
+            reportTemplate2.Name,
             reportContent.ToString(),
             DateTime.UtcNow
         );
@@ -270,52 +273,142 @@ public class ReportManager : DomainService, IReportManager
     
     public async Task<Byte[]> GeneratePdfReportAsync(Report report)
     {
-        // var report = await _reportRepository.FirstOrDefaultAsync(r => r.Id == );
-        // if (report == null)
-        // {
-        //     throw new UserFriendlyException($"No report found with ID: {report.Id}");
-        // }
-
         try
         {
-            var pdfBytes = QuestPDF.Fluent.Document.Create(container =>
+            // Check if the content contains HTML
+            var isHtmlContent = report.Content.Contains("<html") || report.Content.Contains("<!DOCTYPE");
+            
+            if (isHtmlContent)
             {
-                container.Page(page =>
-                {
-                    page.Size(PageSizes.A4);
-                    page.Margin(2, Unit.Centimetre);
-                    page.PageColor(Colors.White);
-                    page.DefaultTextStyle(x => x.FontSize(12));
-
-                    page.Header()
-                        .Text(report.Subject)
-                        .SemiBold().FontSize(20).FontColor(Colors.Blue.Medium);
-
-                    page.Content()
-                        .PaddingVertical(1, Unit.Centimetre)
-                        .Column(col =>
-                        {
-                            foreach (var line in report.Content.Split('\n'))
-                            {
-                                col.Item().Text(line);
-                            }
-                        });
-
-                    page.Footer()
-                        .AlignCenter()
-                        .Text(x =>
-                        {
-                            x.Span("Generated on ");
-                            x.Span(DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")).SemiBold();
-                        });
-                });
-            }).GeneratePdf();
-
-            return pdfBytes;
+                // Use HTML rendering for HTML content
+                return await GeneratePdfFromHtmlAsync(report);
+            }
+            else
+            {
+                // Use traditional rendering for plain text/markdown content
+                return await GeneratePdfFromTextAsync(report);
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating PDF for report ID: {ReportId}", report.Id);
+            throw new UserFriendlyException("An error occurred while generating the PDF report.");
+        }
+    }
+
+    private async Task<byte[]> GeneratePdfFromHtmlAsync(Report report)
+    {
+        try
+        {
+            // Use PuppeteerSharp to convert HTML to PDF
+            await new BrowserFetcher().DownloadAsync();
+            
+            using var browser = await Puppeteer.LaunchAsync(new LaunchOptions
+            {
+                Headless = true,
+                Args = new[] { "--no-sandbox", "--disable-setuid-sandbox" }
+            });
+            
+            using var page = await browser.NewPageAsync();
+            
+            // Set the HTML content
+            await page.SetContentAsync(report.Content);
+            
+            // Wait for any dynamic content to load
+            await Task.Delay(1000);
+            
+            // Generate PDF to temporary file
+            var tempPdfPath = Path.GetTempFileName() + ".pdf";
+            await page.PdfAsync(tempPdfPath);
+            var pdfBytes = await File.ReadAllBytesAsync(tempPdfPath);
+            File.Delete(tempPdfPath);
+            
+            return pdfBytes;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating PDF from HTML for report ID: {ReportId}", report.Id);
+            // Fallback to text rendering if HTML fails
+            return await GeneratePdfFromTextAsync(report);
+        }
+    }
+
+    private async Task<byte[]> GeneratePdfFromTextAsync(Report report)
+    {
+        try
+        {
+            // For plain text, wrap it in a simple HTML structure
+            var htmlContent = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='UTF-8'>
+    <title>{report.Subject}</title>
+    <style>
+        body {{ 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: white;
+        }}
+        .header {{ 
+            background-color: #007bff; 
+            color: white; 
+            padding: 20px; 
+            text-align: center;
+            margin-bottom: 20px;
+        }}
+        .content {{ 
+            padding: 20px;
+        }}
+        .footer {{ 
+            background-color: #6c757d; 
+            color: white; 
+            padding: 10px; 
+            text-align: center; 
+            margin-top: 20px;
+        }}
+    </style>
+</head>
+<body>
+    <div class='header'>
+        <h1>{report.Subject}</h1>
+    </div>
+    <div class='content'>
+        {report.Content.Replace("\n", "<br>")}
+    </div>
+    <div class='footer'>
+        <p>Generated on {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}</p>
+    </div>
+</body>
+</html>";
+            
+            // Use the same PuppeteerSharp approach for text content
+            await new BrowserFetcher().DownloadAsync();
+            
+            using var browser = await Puppeteer.LaunchAsync(new LaunchOptions
+            {
+                Headless = true,
+                Args = new[] { "--no-sandbox", "--disable-setuid-sandbox" }
+            });
+            
+            using var page = await browser.NewPageAsync();
+            
+            await page.SetContentAsync(htmlContent);
+            await Task.Delay(500);
+            
+            var tempPdfPath2 = Path.GetTempFileName() + ".pdf";
+            await page.PdfAsync(tempPdfPath2);
+            var pdfBytes = await File.ReadAllBytesAsync(tempPdfPath2);
+            File.Delete(tempPdfPath2);
+            
+            return pdfBytes;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating PDF from text for report ID: {ReportId}", report.Id);
             throw new UserFriendlyException("An error occurred while generating the PDF report.");
         }
     }

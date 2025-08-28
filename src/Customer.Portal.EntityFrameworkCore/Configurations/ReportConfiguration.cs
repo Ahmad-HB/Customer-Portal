@@ -17,11 +17,9 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
             .OnDelete(DeleteBehavior.NoAction);
 
         builder.Property(x => x.Subject)
-            .IsRequired()
-            .HasMaxLength(256);
+            .IsRequired();
 
-        builder.Property(x => x.Content)
-            .HasMaxLength(1024);
+        builder.Property(x => x.Content);
 
         builder.Property(x => x.GeneratedAt)
             .IsRequired()

@@ -75,8 +75,7 @@ public class ReportAppService : PortalAppService, IReportAppService
             throw new UserFriendlyException("Invalid report type.");
         }
         
-        var stream = new MemoryStream(pdfBytes);
-        return new FileStreamResult(stream, "application/pdf")
+        return new FileContentResult(pdfBytes, "application/pdf")
         {
             FileDownloadName = fileName
         };
