@@ -5,10 +5,12 @@ interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
+  sessionStatus: 'active' | 'expired' | 'checking' | 'none'
   login: (usernameOrEmail: string, password: string, rememberMe?: boolean) => Promise<boolean>
   register: (userData: RegisterRequest) => Promise<boolean>
   logout: () => Promise<void>
   updateUser: (userData: Partial<User>) => Promise<boolean>
+  checkSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -16,53 +18,95 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [sessionStatus, setSessionStatus] = useState<'active' | 'expired' | 'checking' | 'none'>('checking')
+  const [sessionCheckInterval, setSessionCheckInterval] = useState<NodeJS.Timeout | null>(null)
+
+  // Session monitoring function
+  const checkSession = async () => {
+    const token = apiClient.getToken()
+    const demoToken = localStorage.getItem('demo_token')
+    
+    if (!token && !demoToken) {
+      setSessionStatus('none')
+      setUser(null)
+      return
+    }
+    
+    setSessionStatus('checking')
+    
+    if (token) {
+      try {
+        const response = await apiClient.getCurrentUser()
+        if (response.success && response.data) {
+          setUser(response.data)
+          setSessionStatus('active')
+        } else {
+          // Token is invalid, clear it
+          apiClient.logout()
+          setUser(null)
+          setSessionStatus('expired')
+        }
+      } catch (error) {
+        console.error('Session check failed:', error)
+        apiClient.logout()
+        setUser(null)
+        setSessionStatus('expired')
+      }
+    } else if (demoToken) {
+      // Demo authentication - create a demo user
+      const demoUser: User = {
+        id: '1',
+        username: 'demo@example.com',
+        name: 'Demo User',
+        email: 'demo@example.com',
+        phone: '+1234567890',
+        role: 'customer',
+        emailConfirmed: true,
+        phoneNumberConfirmed: true,
+        creationTime: new Date().toISOString(),
+        creatorId: '1',
+        lastModificationTime: new Date().toISOString(),
+        lastModifierId: '1',
+        isDeleted: false,
+        deleterId: undefined,
+        deletionTime: undefined
+      }
+      setUser(demoUser)
+      setSessionStatus('active')
+    }
+  }
 
   // Check if user is already authenticated on app load
   useEffect(() => {
-    const checkAuth = async () => {
-      const token = apiClient.getToken()
-      const demoToken = localStorage.getItem('demo_token')
-      
-      if (token) {
-        try {
-          const response = await apiClient.getCurrentUser()
-          if (response.success && response.data) {
-            setUser(response.data)
-          } else {
-            // Token is invalid, clear it
-            apiClient.logout()
-          }
-        } catch (error) {
-          console.error('Auth check failed:', error)
-          apiClient.logout()
-        }
-      } else if (demoToken) {
-        // Demo authentication - create a demo user
-        const demoUser: User = {
-          id: '1',
-          username: 'demo@example.com',
-          name: 'Demo User',
-          email: 'demo@example.com',
-          phone: '+1234567890',
-          role: 'customer',
-          emailConfirmed: true,
-          phoneNumberConfirmed: true,
-          creationTime: new Date().toISOString(),
-          creatorId: '1',
-          lastModificationTime: new Date().toISOString(),
-          lastModifierId: '1',
-          isDeleted: false,
-          deleterId: undefined,
-          deletionTime: undefined
-        }
-        setUser(demoUser)
-      }
-      
+    checkSession().finally(() => {
       setIsLoading(false)
+    })
+  }, [])
+
+  // Set up periodic session checking
+  useEffect(() => {
+    // Clear any existing interval
+    if (sessionCheckInterval) {
+      clearInterval(sessionCheckInterval)
     }
 
-    checkAuth()
-  }, [])
+    // Only set up interval if user is authenticated
+    if (user && sessionStatus === 'active') {
+      const interval = setInterval(() => {
+        console.log('Checking session status...')
+        checkSession()
+      }, 5 * 60 * 1000) // Check every 5 minutes
+      
+      setSessionCheckInterval(interval)
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (sessionCheckInterval) {
+        clearInterval(sessionCheckInterval)
+      }
+    }
+  }, [user, sessionStatus])
 
   const login = async (usernameOrEmail: string, password: string, rememberMe: boolean = false): Promise<boolean> => {
     try {
@@ -80,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (userResponse.success && userResponse.data) {
           setUser(userResponse.data)
+          setSessionStatus('active')
           
           // Handle remember me functionality
           if (rememberMe) {
@@ -120,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         
         setUser(demoUser)
+        setSessionStatus('active')
         localStorage.setItem('demo_token', 'demo_auth_token')
         
         // Handle remember me functionality
@@ -169,6 +215,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Clear user state first to prevent any UI issues
       setUser(null)
+      setSessionStatus('none')
+      
+      // Clear any session check interval
+      if (sessionCheckInterval) {
+        clearInterval(sessionCheckInterval)
+        setSessionCheckInterval(null)
+      }
       
       // Call the API logout
       await apiClient.logout()
@@ -207,10 +260,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     isAuthenticated: !!user,
     isLoading,
+    sessionStatus,
     login,
     register,
     logout,
     updateUser,
+    checkSession,
   }
 
   return (

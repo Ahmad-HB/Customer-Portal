@@ -27,8 +27,4 @@ public class TicketComment : FullAuditedEntity<Guid>
         Comment = comment;
         CommentedAt = commentedAt;
     }
-
-    public TicketComment(Guid id)
-    {
-    }
 }

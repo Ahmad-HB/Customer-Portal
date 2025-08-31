@@ -13,6 +13,7 @@ import {
   Settings
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { SessionStatusIndicator } from './SessionStatusIndicator'
 
 // Define navigation items for each role
 const navigationByRole = {
@@ -97,6 +98,11 @@ export function SidebarNav() {
       </div>
 
       <div className="flex flex-col items-center space-y-4 pb-6">
+        {/* Session Status Indicator */}
+        <div className="px-2">
+          <SessionStatusIndicator />
+        </div>
+
         <Link
           to={profileLink}
           className="flex h-12 w-12 items-center justify-center rounded-full bg-sidebar-accent hover:bg-sidebar-primary transition-all duration-200 hover:scale-110 active:scale-95 hover:shadow-md"

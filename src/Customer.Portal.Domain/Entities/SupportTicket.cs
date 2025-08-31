@@ -36,5 +36,25 @@ public class SupportTicket : FullAuditedAggregateRoot<Guid>
     public DateTime CreatedAt { get; set; } = DateTime.Now.Date;
     
     public DateTime? ResolvedAt { get; set; }
+
+    public SupportTicket(Guid id, Guid appUserId, Guid servicePlanId, string subject, string description) : base(id)
+    {
+        Id = id;
+        AppUserId = appUserId;
+        ServicePlanId = servicePlanId;
+        Subject = subject;
+        Description = description;
+        Status = TicketStatus.Open;
+        CreatedAt = DateTime.Now.Date;
+
+        TicketComments = new List<TicketComment>();
+    }
+
+
+    public SupportTicket()
+    {
+        
+    }
+    
     
 }

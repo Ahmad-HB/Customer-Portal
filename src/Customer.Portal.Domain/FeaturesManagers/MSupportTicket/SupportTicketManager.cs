@@ -12,6 +12,7 @@ using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Domain.Services;
 using Volo.Abp.Guids;
 using Volo.Abp.Identity;
+using Volo.Abp.Uow;
 
 
 namespace Customer.Portal.FeaturesManagers.MSupportTicket;
@@ -22,8 +23,8 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
 
     private readonly IRepository<SupportTicket, Guid> _supportTicketRepository;
     private readonly IRepository<IdentityUser, Guid> _identityUserRepository;
-    private readonly IRepository<IdentityRole, Guid> _identityRoleRepository;
-    private readonly IRepository<IdentityUserRole> _identityUserRoleRepository;
+    // private readonly IRepository<IdentityRole, Guid> _identityRoleRepository;
+    // private readonly IRepository<IdentityUserRole> _identityUserRoleRepository;
     private readonly IRepository<AppUser, Guid> _appUserRepository;
     private readonly IGuidGenerator _guidGenerator;
     private readonly ITicketCommentManager _ticketCommentManager;
@@ -34,15 +35,14 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
 
     public SupportTicketManager(IRepository<SupportTicket, Guid> supportTicketRepository,
         IRepository<IdentityUser, Guid> userRepository, IGuidGenerator guidGenerator,
-        IRepository<IdentityRole, Guid> identityRoleRepository,
-        IRepository<IdentityUserRole> identityUserRoleRepository, IRepository<AppUser, Guid> appUserRepository,
+        IRepository<AppUser, Guid> appUserRepository,
         ITicketCommentManager ticketCommentManager)
     {
         _supportTicketRepository = supportTicketRepository;
         _identityUserRepository = userRepository;
         _guidGenerator = guidGenerator;
-        _identityRoleRepository = identityRoleRepository;
-        _identityUserRoleRepository = identityUserRoleRepository;
+        // _identityRoleRepository = identityRoleRepository;
+        // _identityUserRoleRepository = identityUserRoleRepository;
         _appUserRepository = appUserRepository;
         _ticketCommentManager = ticketCommentManager;
     }
@@ -65,11 +65,20 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
         supportTicket.Status = TicketStatus.Open;
         supportTicket.CreatedAt = DateTime.UtcNow;
 
-        await _supportTicketRepository.InsertAsync(supportTicket);
+        var supportTicket2 = new SupportTicket(
+            _guidGenerator.Create(),
+            appUserId,
+            supportTicket.ServicePlanId,
+            supportTicket.Subject,
+            supportTicket.Description
+        );
+
+        await _supportTicketRepository.InsertAsync(supportTicket2);
+        
 
         // Send notification to support team about the new ticket
 
-        await AssignSupportAgentAsync(supportTicket.Id);
+        await AssignSupportAgentAsync(supportTicket2.Id);
     }
 
     public async Task<SupportTicket> GetSupportTicketByIdAsync(Guid supportTicketId)

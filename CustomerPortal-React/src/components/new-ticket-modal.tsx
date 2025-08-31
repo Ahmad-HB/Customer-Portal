@@ -20,7 +20,6 @@ export function NewTicketModal({ isOpen, onClose }: NewTicketModalProps) {
     servicePlan: "",
     subject: "",
     description: "",
-    priority: "low",
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -28,7 +27,7 @@ export function NewTicketModal({ isOpen, onClose }: NewTicketModalProps) {
     console.log("New ticket:", formData)
     // Handle form submission here
     onClose()
-    setFormData({ servicePlan: "", subject: "", description: "", priority: "low" })
+    setFormData({ servicePlan: "", subject: "", description: "" })
   }
 
   if (!isOpen) return null
@@ -100,21 +99,7 @@ export function NewTicketModal({ isOpen, onClose }: NewTicketModalProps) {
             />
           </div>
 
-          {/* Priority */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Priority Level</Label>
-            <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value })}>
-              <SelectTrigger className="h-12">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Low Priority</SelectItem>
-                <SelectItem value="medium">Medium Priority</SelectItem>
-                <SelectItem value="high">High Priority</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
 
           {/* Description */}
           <div className="space-y-2">

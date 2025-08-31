@@ -77,6 +77,13 @@ public class ServicePlanManager : DomainService, IServicePlanManager
         {
             throw new UserFriendlyException("Service plan not found.");
         }
+        
+        // Check if user already has an active subscription
+        // var existingSubscription = await _usersServicePlanRepository.FirstOrDefaultAsync(x => x.AppUserId == appUser.Id && servicePlanId == x.ServicePlanId);
+        // if (existingSubscription != null)
+        // {
+        //     throw new UserFriendlyException("User already has an active subscription.");
+        // }
 
         var userServicePlan = new UserServicePlan(
             _guidGenerator.Create(),

@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { useSessionMonitor } from './hooks/useSessionMonitor'
 import './App.css'
 
 // Import pages
@@ -21,6 +22,9 @@ import { LoadingOverlay } from '@/components/ui/loading-spinner'
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
+  
+  // Monitor session status
+  useSessionMonitor()
 
   if (isLoading) {
     return <LoadingOverlay text="Checking authentication..." />
