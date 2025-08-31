@@ -15,7 +15,7 @@ public class UserServicePlanConfiguration : IEntityTypeConfiguration<UserService
         
         builder.Property(x => x.IsSuspended).IsRequired();
         
-        builder.Property(x => x.SuspensionReason).HasMaxLength(512);
+        builder.Property(x => x.SuspensionReason);
         
 
         builder.Property(x => x.AppUserId)

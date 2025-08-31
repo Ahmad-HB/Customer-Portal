@@ -96,20 +96,20 @@ public class ReportManager : DomainService, IReportManager
             IssueDescription = supportTicket.Description,
             Status = supportTicket.Status.ToString(),
             CreatedAt = supportTicket.CreatedAt.ToString("yyyy-MM-dd"),
-            ResolvedAt = supportTicket.ResolvedAt?.ToString("yyyy-MM-dd")
+            ResolvedAt = supportTicket.ResolvedAt?.ToString("yyyy-MM-dd"),
+            date = new { now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") }
         };
         
-        var reportContent = await _templateRenderer.RenderAsync(
-            "SupportAgentReport",
-            templateData
-        );
+        // Use Scriban to render the template from database
+        var template = Template.Parse(reportTemplate.Format);
+        var reportContent = template.Render(templateData);
         
         
         var report = new Report(
             _guidGenerator.Create(),
             reportTemplate.Id,
             reportTemplate.Name,
-            reportContent.ToString(),
+            reportContent,
             DateTime.UtcNow
         );
         await _reportRepository.InsertAsync(report);
@@ -148,19 +148,19 @@ public class ReportManager : DomainService, IReportManager
             IssueDescription = supportTicket.Description,
             Status = supportTicket.Status.ToString(),
             CreatedAt = supportTicket.CreatedAt.ToString("yyyy-MM-dd"),
-            ResolvedAt = supportTicket.ResolvedAt?.ToString("yyyy-MM-dd")
+            ResolvedAt = supportTicket.ResolvedAt?.ToString("yyyy-MM-dd"),
+            date = new { now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") }
         };
         
-        var reportContent = await _templateRenderer.RenderAsync(
-            "SupportAgentWithTechnicianReport",
-            templateData
-        );
+        // Use Scriban to render the template from database
+        var template = Template.Parse(reportTemplate.Format);
+        var reportContent = template.Render(templateData);
         
         var report = new Report(
             _guidGenerator.Create(),
             reportTemplate.Id,
             reportTemplate.Name,
-            reportContent.ToString(),
+            reportContent,
             DateTime.UtcNow
         );
         await _reportRepository.InsertAsync(report);
@@ -195,19 +195,19 @@ public class ReportManager : DomainService, IReportManager
             IssueDescription = supportTicket.Description,
             Status = supportTicket.Status.ToString(),
             CreatedAt = supportTicket.CreatedAt.ToString("yyyy-MM-dd"),
-            ResolvedAt = supportTicket.ResolvedAt?.ToString("yyyy-MM-dd")
+            ResolvedAt = supportTicket.ResolvedAt?.ToString("yyyy-MM-dd"),
+            date = new { now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") }
         };
         
-        var reportContent = await _templateRenderer.RenderAsync(
-            "TechnicianReport",
-            templateData
-        );
+        // Use Scriban to render the template from database
+        var template = Template.Parse(reportTemplate.Format);
+        var reportContent = template.Render(templateData);
         
         var report = new Report(
             _guidGenerator.Create(),
             reportTemplate.Id,
             reportTemplate.Name,
-            reportContent.ToString(),
+            reportContent,
             DateTime.UtcNow
         );
         
@@ -238,27 +238,19 @@ public class ReportManager : DomainService, IReportManager
             total_tickets = totalTickets.Count,
             resolved_tickets = resolvedTickets,
             in_progress_tickets = inProgressTickets,
-            closed_tickets = closedTickets
+            closed_tickets = closedTickets,
+            date = new { now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") }
         };
         
-        // string reportTemplate = await File.ReadAllTextAsync("MonthlySummaryReport.tpl");
-        
-        
-        // var template = Template.Parse(reportTemplate);
-        
-        // var reportContent = template.Render(templateData);
-        
-        // Use ABP's ITemplateRenderer
-        var reportContent = await _templateRenderer.RenderAsync(
-            "MonthlySummaryReport",
-            templateData
-        );
+        // Use Scriban to render the template from database
+        var template = Template.Parse(reportTemplate2.Format);
+        var reportContent = template.Render(templateData);
         
         var report = new Report(
             _guidGenerator.Create(),
             reportTemplate2.Id,
             reportTemplate2.Name,
-            reportContent.ToString(),
+            reportContent,
             DateTime.UtcNow
         );
         

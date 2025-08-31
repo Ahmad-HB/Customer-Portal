@@ -17,9 +17,20 @@ public class UserServicePlan : FullAuditedEntity<Guid>
 
     public bool IsSuspended { get; set; }
 
-    public string SuspensionReason { get; set; }
+    public string? SuspensionReason { get; set; }
     
     public DateTime StartDate { get; set; }
 
     public DateTime EndDate { get; set; }
+
+    public UserServicePlan( Guid id, Guid servicePlanId, Guid appUserId, bool isActive, DateTime startDate, DateTime endDate) : base(id)
+    {
+        id = Id;
+        ServicePlanId = servicePlanId;
+        AppUserId = appUserId;
+        IsActive = isActive;
+        StartDate = startDate;
+        EndDate = endDate;
+    }
+
 }

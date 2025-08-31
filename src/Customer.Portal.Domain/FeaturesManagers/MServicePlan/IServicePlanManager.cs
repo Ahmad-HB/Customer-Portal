@@ -11,4 +11,6 @@ public interface IServicePlanManager : IDomainService
     public Task<ServicePlan> GetServicePlanAsync(Guid id);
     
     public Task<List<ServicePlan>> GetServicePlansAsync();
+    
+    public Task SubcribeToServicePlanAsync(Guid identityUserId, Guid servicePlanId);
 }

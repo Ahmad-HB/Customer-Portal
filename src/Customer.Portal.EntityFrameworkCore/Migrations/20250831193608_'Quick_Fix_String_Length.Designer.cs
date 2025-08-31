@@ -4,6 +4,7 @@ using Customer.Portal.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Volo.Abp.EntityFrameworkCore;
 
@@ -12,9 +13,11 @@ using Volo.Abp.EntityFrameworkCore;
 namespace Customer.Portal.Migrations
 {
     [DbContext(typeof(PortalDbContext))]
-    partial class PortalDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250831193608_'Quick_Fix_String_Length")]
+    partial class Quick_Fix_String_Length
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -594,7 +597,9 @@ namespace Customer.Portal.Migrations
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("SuspensionReason")
-                        .HasColumnType("longtext");
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("varchar(512)");
 
                     b.HasKey("Id");
 

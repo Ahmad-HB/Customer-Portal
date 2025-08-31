@@ -15,7 +15,7 @@ public class ServicePlanConfiguration : IEntityTypeConfiguration<ServicePlan>
 
         builder.Property(x => x.Name).IsRequired().HasMaxLength(256);
         
-        builder.Property(x => x.Description).HasMaxLength(1024);
+        builder.Property(x => x.Description);
         
         builder.Property(x => x.Price).HasColumnType("decimal(18,2)");
         

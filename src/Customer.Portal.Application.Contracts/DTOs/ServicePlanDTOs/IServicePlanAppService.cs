@@ -11,4 +11,6 @@ public interface IServicePlanAppService : IApplicationService
     
     public Task<PagedResultDto<ServicePlanDto>> GetServicePlansAsync();
     
+    public Task SubcribeToServicePlanAsync(Guid servicePlanId);
+    
 }

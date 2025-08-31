@@ -51,6 +51,13 @@ public class ServicePlanAppService : PortalAppService, IServicePlanAppService
         return new PagedResultDto<ServicePlanDto>(servicePlans.Count, ObjectMapper.Map<List<ServicePlan>, List<ServicePlanDto>>(servicePlans));
     }
 
+    public async Task SubcribeToServicePlanAsync(Guid servicePlanId)
+    {
+        Guid identityUserId = _currentUser.Id ?? throw new UserFriendlyException("User is not logged in.");
+        
+        await _servicePlanManager.SubcribeToServicePlanAsync(identityUserId, servicePlanId);
+    }
+
     #endregion
     
     
