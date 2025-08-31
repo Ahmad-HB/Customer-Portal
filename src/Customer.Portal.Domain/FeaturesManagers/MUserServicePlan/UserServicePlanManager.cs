@@ -33,19 +33,27 @@ public class UserServicePlanManager : DomainService, IUserServicePlanManager
 
     public async Task<List<UserServicePlan>> GetUserServicePlansAsync(Guid identityUserId)
     {
-        var query = await _identityUserRepository.GetQueryableAsync();
+        var identityUserQuery = await _identityUserRepository.GetQueryableAsync();
         var identityUser = await _identityUserRepository.GetAsync(identityUserId);
         if (identityUser == null)
         {
             throw new Exception("Identity user not found.");
         }
         
-        var appUserId = await query
+        var appUserId = await identityUserQuery
             .Where(u => u.Id == identityUserId)
             .Select(u => EF.Property<Guid>(u, "AppUserId"))
             .FirstOrDefaultAsync();
 
-        return await _userServicePlanRepository.GetListAsync(u => u.AppUserId == appUserId);
+        var userServiceQuery = _userServicePlanRepository.GetQueryableAsync();
+        var userServicePlans = await userServiceQuery
+            .Result
+            .Where(x => x.AppUserId == appUserId)
+            .Include(x => x.ServicePlan)
+            .Include(x => x.AppUser)
+            .ToListAsync();
+
+        return userServicePlans;
     }
 
     public async Task<UserServicePlan> GetUserServicePlanAsync(Guid identityUserId, Guid id)
