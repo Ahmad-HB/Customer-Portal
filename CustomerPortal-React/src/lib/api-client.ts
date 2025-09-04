@@ -41,6 +41,29 @@ export interface AbpEntity {
   deletionTime?: string
 }
 
+// AppUser DTO interface based on backend enum
+export interface AppUser extends AbpEntity {
+  userName: string
+  name: string
+  email: string
+  phoneNumber?: string
+  userType: UserTypeValue
+  emailConfirmed?: boolean
+  phoneNumberConfirmed?: boolean
+  lockoutEnabled?: boolean
+  lockoutEnd?: string
+}
+
+// UserType enum matching backend
+export const UserType = {
+  Admin: 1,
+  Customer: 2,
+  SupportAgent: 3,
+  Technician: 4
+} as const
+
+export type UserTypeValue = typeof UserType[keyof typeof UserType]
+
 // Types for API responses
 export interface ApiResponse<T> {
   data: T
@@ -388,9 +411,241 @@ class ApiClient {
   }
 
   // User Management (ABP Account)
+  // Get current app user from the new endpoint
+  async getCurrentAppUser(): Promise<ApiResponse<AppUser>> {
+    try {
+      const response = await fetch(`${this.baseURL}/api/app/app-user/current-app-user`, {
+        method: 'GET',
+        headers: { 
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to get app user profile'
+        
+        try {
+          const errorData = await response.json()
+          
+          if (errorData.error?.message) {
+            errorMessage = errorData.error.message
+          }
+        } catch (jsonError) {
+          errorMessage = `Failed to get app user profile with status ${response.status}`
+        }
+        
+        return {
+          data: null as unknown as AppUser,
+          success: false,
+          message: errorMessage
+        }
+      }
+
+      try {
+        const data = await response.json()
+        
+        const appUser: AppUser = {
+          id: data.id || 'user-id',
+          userName: data.userName,
+          name: data.name,
+          email: data.email,
+          phoneNumber: data.phoneNumber,
+          userType: data.userType,
+          emailConfirmed: data.emailConfirmed ?? true,
+          phoneNumberConfirmed: data.phoneNumberConfirmed ?? true,
+          creationTime: data.creationTime || new Date().toISOString(),
+          creatorId: data.creatorId || data.id || 'user-id',
+          lastModificationTime: data.lastModificationTime || new Date().toISOString(),
+          lastModifierId: data.lastModifierId || data.id || 'user-id',
+          isDeleted: data.isDeleted || false
+        }
+        
+        return {
+          data: appUser,
+          success: true,
+          message: 'App user profile retrieved successfully'
+        }
+      } catch (jsonError) {
+        console.error('Could not parse app user response as JSON:', jsonError)
+        return {
+          data: null as unknown as AppUser,
+          success: false,
+          message: 'Invalid app user profile response'
+        }
+      }
+    } catch (error) {
+      console.error('Get current app user request failed:', error)
+      return {
+        data: null as unknown as AppUser,
+        success: false,
+        message: error instanceof Error ? error.message : 'Network error getting app user profile'
+      }
+    }
+  }
+
+  // Get current user role from the dedicated role endpoint
+  async getCurrentUserRole(): Promise<ApiResponse<{ role: string; userType: number }>> {
+    try {
+      const response = await fetch(`${this.baseURL}/api/app/app-user/currnt-user-role`, {
+        method: 'GET',
+        headers: { 
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to get user role'
+        
+        try {
+          const errorData = await response.json()
+          
+          if (errorData.error?.message) {
+            errorMessage = errorData.error.message
+          }
+        } catch (jsonError) {
+          errorMessage = `Failed to get user role with status ${response.status}`
+        }
+        
+        return {
+          data: null as unknown as { role: string; userType: number },
+          success: false,
+          message: errorMessage
+        }
+      }
+
+      try {
+        const data = await response.json()
+        
+        // Handle the string response from the new API endpoint
+        // The API returns "admin", "customer", "technician", "supportAgent"
+        let roleData: { role: string; userType: number }
+        
+        if (typeof data === 'string') {
+          // API returned just a string like "admin"
+          const role = data.toLowerCase()
+          const roleToUserType: Record<string, number> = {
+            'admin': 1,
+            'customer': 2,
+            'supportAgent': 3,
+            'technician': 4
+          }
+          roleData = {
+            role: data, // Keep the original string
+            userType: roleToUserType[role] || 2 // Default to customer if unknown
+          }
+        } else if (data.role) {
+          // API returned an object with role property
+          roleData = {
+            role: data.role,
+            userType: data.userType || 2
+          }
+        } else {
+          // Fallback
+          roleData = {
+            role: 'customer',
+            userType: 2
+          }
+        }
+        
+        return {
+          data: roleData,
+          success: true,
+          message: 'User role retrieved successfully'
+        }
+      } catch (jsonError) {
+        console.error('Could not parse user role response as JSON:', jsonError)
+        return {
+          data: null as unknown as { role: string; userType: number },
+          success: false,
+          message: 'Invalid user role response'
+        }
+      }
+    } catch (error) {
+      console.error('Get current user role request failed:', error)
+      return {
+        data: null as unknown as { role: string; userType: number },
+        success: false,
+        message: error instanceof Error ? error.message : 'Network error getting user role'
+      }
+    }
+  }
+
+  // User Management (ABP Account) - Legacy method for backward compatibility
   async getCurrentUser(): Promise<ApiResponse<User>> {
     try {
-      console.log('Getting current user from: /api/account/my-profile')
+      // First try to get the app user from the new endpoint
+      const appUserResponse = await this.getCurrentAppUser()
+      
+      if (appUserResponse.success && appUserResponse.data) {
+        // Map the AppUser DTO response to our User interface
+        // Determine user role from the userType enum
+        let userRole: 'customer' | 'technician' | 'supportAgent' | 'admin' = 'customer'
+        
+        // Map the numeric userType to our role string
+        console.log('Raw userType from API:', appUserResponse.data.userType)
+        console.log('UserType constants:', UserType)
+        
+        // Handle potential type mismatches - convert to number if it's a string
+        let userTypeValue: number = appUserResponse.data.userType
+        if (typeof userTypeValue === 'string') {
+          userTypeValue = parseInt(userTypeValue, 10)
+          console.log('Converted string userType to number:', userTypeValue)
+        }
+        
+        console.log('Comparing userType with UserType.Technician:', userTypeValue === UserType.Technician)
+        
+        switch (userTypeValue) {
+          case UserType.Admin:
+            userRole = 'admin'
+            console.log('Role mapped to admin')
+            break
+          case UserType.SupportAgent:
+            userRole = 'supportAgent'
+            console.log('Role mapped to supportAgent')
+            break
+          case UserType.Technician:
+            userRole = 'technician'
+            console.log('Role mapped to technician')
+            break
+          case UserType.Customer:
+            userRole = 'customer'
+            console.log('Role mapped to customer')
+            break
+          default:
+            userRole = 'customer'
+            console.log('Role mapped to customer (default)')
+            break
+        }
+        
+        console.log('Final extracted user role:', userRole, 'from userType:', appUserResponse.data.userType)
+        
+        const user: User = {
+          id: appUserResponse.data.id,
+          username: appUserResponse.data.userName,
+          name: appUserResponse.data.name,
+          email: appUserResponse.data.email,
+          phone: appUserResponse.data.phoneNumber || '',
+          role: userRole,
+          emailConfirmed: appUserResponse.data.emailConfirmed ?? true,
+          phoneNumberConfirmed: appUserResponse.data.phoneNumberConfirmed ?? true,
+          creationTime: appUserResponse.data.creationTime || new Date().toISOString(),
+          creatorId: appUserResponse.data.creatorId || appUserResponse.data.id,
+          lastModificationTime: appUserResponse.data.lastModificationTime || new Date().toISOString(),
+          lastModifierId: appUserResponse.data.lastModifierId || appUserResponse.data.id,
+          isDeleted: appUserResponse.data.isDeleted || false
+        }
+        
+        return {
+          data: user,
+          success: true,
+          message: 'User profile retrieved successfully'
+        }
+      }
+      
+      // Fallback to legacy endpoint if new endpoint fails
+      console.log('Falling back to legacy endpoint: /api/account/my-profile')
       const response = await fetch(`${this.baseURL}/api/account/my-profile`, {
         method: 'GET',
         headers: { 
@@ -428,20 +683,63 @@ class ApiClient {
         console.log('Get current user success data:', data)
         
         // Map the ABP.io user response to our User interface
+        // Determine user role from the response data
+        let userRole: 'customer' | 'technician' | 'supportAgent' | 'admin' = 'customer'
+        
+        // Check for roles in different possible locations in the ABP response
+        if (data.roles && Array.isArray(data.roles)) {
+          // Check for specific role names
+          if (data.roles.includes('admin') || data.roles.includes('Admin')) {
+            userRole = 'admin'
+          } else if (data.roles.includes('support') || data.roles.includes('Support') || data.roles.includes('supportAgent') || data.roles.includes('SupportAgent')) {
+            userRole = 'supportAgent'
+          } else if (data.roles.includes('technician') || data.roles.includes('Technician')) {
+            userRole = 'technician'
+          }
+        } else if (data.role) {
+          // Single role field
+          const role = data.role.toLowerCase()
+          if (role.includes('admin')) {
+            userRole = 'admin'
+          } else if (role.includes('support')) {
+            userRole = 'supportAgent'
+          } else if (role.includes('technician')) {
+            userRole = 'technician'
+          }
+        } else if (data.claims && Array.isArray(data.claims)) {
+          // Check claims for role information
+          const roleClaim = data.claims.find((claim: any) => 
+            claim.type === 'role' || claim.claimType === 'role' || 
+            claim.type === 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role'
+          )
+          if (roleClaim && roleClaim.value) {
+            const role = roleClaim.value.toLowerCase()
+            if (role.includes('admin')) {
+              userRole = 'admin'
+            } else if (role.includes('support')) {
+              userRole = 'supportAgent'
+            } else if (role.includes('technician')) {
+              userRole = 'technician'
+            }
+          }
+        }
+        
+        console.log('Extracted user role:', userRole, 'from data:', data)
+        
         const user: User = {
           id: data.id || 'user-id',
           username: data.userName,
           name: data.name,
           email: data.email,
           phone: data.phoneNumber,
-          role: 'customer', // Default role, you might want to get this from user claims or roles
-          emailConfirmed: true, // Assuming confirmed if we can get the profile
-          phoneNumberConfirmed: true,
-          creationTime: new Date().toISOString(),
-          creatorId: data.id || 'user-id',
-          lastModificationTime: new Date().toISOString(),
-          lastModifierId: data.id || 'user-id',
-          isDeleted: false
+          role: userRole,
+          emailConfirmed: data.emailConfirmed ?? true,
+          phoneNumberConfirmed: data.phoneNumberConfirmed ?? true,
+          creationTime: data.creationTime || new Date().toISOString(),
+          creatorId: data.creatorId || data.id || 'user-id',
+          lastModificationTime: data.lastModificationTime || new Date().toISOString(),
+          lastModifierId: data.lastModifierId || data.id || 'user-id',
+          isDeleted: data.isDeleted || false
         }
         
         return {

@@ -3,12 +3,8 @@ using Volo.Abp.Application.Dtos;
 
 namespace Customer.Portal.DTOs.EmailDTOs;
 
-public class CreateUpdateEmailDto : EntityDto<Guid>
+public class CreateUpdateEmailDto
 {
-    public Guid IdentityUserId { get; set; }
-    
-    public Guid EmailTemplateId { get; set; }
-
     public string EmailAddress { get; set; }
 
     public string Subject { get; set; }

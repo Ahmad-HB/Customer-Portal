@@ -1,21 +1,24 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { User, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { useAuth } from "@/contexts/AuthContext"
+import { useState, useEffect } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { useCurrentUserRole } from '@/hooks/useAbpApi'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { User, EyeOff, Shield, Loader2 } from 'lucide-react'
+import { toast } from '@/hooks/use-toast'
+import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { useTickets } from "@/hooks/useTickets"
 import { useUserServicePlans } from "@/hooks/useUserServicePlans"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { apiClient } from '@/lib/api-client'
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth()
+  const { role: currentRole, isLoading: roleLoading, isAdmin } = useCurrentUserRole()
   const { tickets, loading: ticketsLoading } = useTickets()
   const { 
     userServicePlans, 
@@ -23,6 +26,18 @@ export default function ProfilePage() {
     suspendUserServicePlan, 
     reactivateUserServicePlan 
   } = useUserServicePlans()
+
+  // State for AppUser data from the backend
+  const [appUserData, setAppUserData] = useState<any>(null)
+  const [appUserLoading, setAppUserLoading] = useState(true)
+  
+  // Temporary debugging
+  useEffect(() => {
+    console.log('🔍 [Profile Debug] user.role from AuthContext:', user?.role)
+    console.log('🔍 [Profile Debug] currentRole from useCurrentUserRole:', currentRole)
+    console.log('🔍 [Profile Debug] isAdmin from useCurrentUserRole:', isAdmin)
+    console.log('🔍 [Profile Debug] roleLoading:', roleLoading)
+  }, [user?.role, currentRole, isAdmin, roleLoading])
   
   const [formData, setFormData] = useState({
     name: "",
@@ -30,7 +45,7 @@ export default function ProfilePage() {
     username: "",
     email: "",
     phone: "",
-    address: "",
+    role: "",
   })
 
   const [originalData, setOriginalData] = useState({
@@ -39,7 +54,7 @@ export default function ProfilePage() {
     username: "",
     email: "",
     phone: "",
-    address: "",
+    role: "",
   })
 
   const [hasChanges, setHasChanges] = useState(false)
@@ -48,21 +63,52 @@ export default function ProfilePage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  // Initialize with real user data from backend
+  // Fetch user profile data directly from /api/account/my-profile
   useEffect(() => {
-    if (user) {
+    const fetchUserProfileData = async () => {
+      try {
+        setAppUserLoading(true)
+        const response = await fetch('https://localhost:44338/api/account/my-profile', {
+          method: 'GET',
+          headers: { 
+            'Accept': 'application/json'
+          },
+          credentials: 'include'
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch profile: ${response.status}`)
+        }
+
+        const data = await response.json()
+        setAppUserData(data)
+        console.log('🔍 [Profile Debug] User profile data from /api/account/my-profile:', data)
+      } catch (error) {
+        console.error('Error fetching user profile data:', error)
+      } finally {
+        setAppUserLoading(false)
+      }
+    }
+
+    fetchUserProfileData()
+  }, [])
+
+  // Initialize with real user data from /api/account/my-profile
+  useEffect(() => {
+    if (appUserData && currentRole && !roleLoading) {
       const userData = {
-        name: user.name || "",
-        surname: "", // Backend doesn't seem to have surname
-        username: user.username || "",
-        email: user.email || "",
-        phone: user.phone || "",
-        address: "", // Backend doesn't seem to have address
+        name: appUserData.name || "",           // ✅ Use name from /api/account/my-profile
+        surname: appUserData.surname || "",     // ✅ Use surname from /api/account/my-profile (can be null)
+        username: appUserData.userName || "",   // ✅ Use userName from /api/account/my-profile
+        email: appUserData.email || "",         // ✅ Use email from /api/account/my-profile
+        phone: appUserData.phoneNumber || "",   // ✅ Use phoneNumber from /api/account/my-profile
+        role: currentRole || "",
       }
       setFormData(userData)
       setOriginalData(userData)
+      console.log('🔍 [Profile Debug] Form data initialized with /api/account/my-profile data:', userData)
     }
-  }, [user])
+  }, [appUserData, currentRole, roleLoading])
 
   // Check for changes whenever formData changes
   useEffect(() => {
@@ -73,6 +119,9 @@ export default function ProfilePage() {
   }, [formData, originalData])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Don't allow changes to the role field
+    if (e.target.name === 'role') return
+    
     setFormData((prev) => ({
       ...prev,
       [e.target.name]: e.target.value,
@@ -153,7 +202,30 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-8 space-y-8">
+      {/* Header with role display */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">
+            {window.location.pathname === '/admin/profile' ? 'Admin Profile' : 'Profile'}
+          </h1>
+          {!roleLoading && currentRole && (
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-sm text-muted-foreground">Role:</span>
+              <Badge variant="secondary" className="capitalize">
+                {currentRole}
+              </Badge>
+              {isAdmin && (
+                <Badge variant="destructive">Administrator</Badge>
+              )}
+              {window.location.pathname === '/admin/profile' && (
+                <Badge variant="outline">Admin Route</Badge>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Error Message */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -167,6 +239,8 @@ export default function ProfilePage() {
           <p className="text-green-600 text-sm">{success}</p>
         </div>
       )}
+
+
 
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Left side - Avatar */}
@@ -188,9 +262,10 @@ export default function ProfilePage() {
               <Input
                 id="surname"
                 name="surname"
-                value={formData.surname}
+                value={formData.surname || ""}
                 onChange={handleChange}
                 className="rounded-full"
+                placeholder="No surname"
               />
             </div>
           </div>
@@ -232,14 +307,19 @@ export default function ProfilePage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="role" className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Role
+              </Label>
               <Input
-                id="address"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                className="rounded-full"
+                id="role"
+                name="role"
+                value={formData.role}
+                disabled
+                className="rounded-full bg-gray-100 cursor-not-allowed text-gray-700 font-medium"
+                placeholder="Your role will be displayed here"
               />
+              <p className="text-xs text-muted-foreground">This field shows your current role and cannot be edited</p>
             </div>
           </div>
 
@@ -330,7 +410,7 @@ export default function ProfilePage() {
             )}
           </TabsContent>
 
-                    <TabsContent value="service-plans" className="mt-6">
+          <TabsContent value="service-plans" className="mt-6">
             {plansLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin mr-2" />
@@ -371,46 +451,46 @@ export default function ProfilePage() {
                                 {new Date(subscription.endDate).toLocaleDateString()}
                               </p>
                             </div>
-                                                      <div className="flex gap-2">
-                            {subscription.isActive && !subscription.isSuspended ? (
-                              <Button 
-                                variant="destructive" 
-                                size="sm" 
-                                className="rounded-full"
-                                onClick={() => handleSuspend(subscription.id)}
-                                disabled={actionLoading === subscription.id}
-                              >
-                                {actionLoading === subscription.id ? (
-                                  <div className="flex items-center gap-2">
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                    Suspending...
-                                  </div>
-                                ) : (
-                                  'Suspend'
-                                )}
+                            <div className="flex gap-2">
+                              {subscription.isActive && !subscription.isSuspended ? (
+                                <Button 
+                                  variant="destructive" 
+                                  size="sm" 
+                                  className="rounded-full"
+                                  onClick={() => handleSuspend(subscription.id)}
+                                  disabled={actionLoading === subscription.id}
+                                >
+                                  {actionLoading === subscription.id ? (
+                                    <div className="flex items-center gap-2">
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                      Suspending...
+                                    </div>
+                                  ) : (
+                                    'Suspend'
+                                  )}
+                                </Button>
+                              ) : (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="rounded-full bg-green-500 text-white hover:bg-green-600"
+                                  onClick={() => handleReactivate(subscription.id)}
+                                  disabled={actionLoading === subscription.id}
+                                >
+                                  {actionLoading === subscription.id ? (
+                                    <div className="flex items-center gap-2">
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                      Reactivating...
+                                    </div>
+                                  ) : (
+                                    'Reactivate'
+                                  )}
+                                </Button>
+                              )}
+                              <Button variant="outline" size="sm" className="rounded-full bg-transparent">
+                                Change Plan
                               </Button>
-                            ) : (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="rounded-full bg-green-500 text-white hover:bg-green-600"
-                                onClick={() => handleReactivate(subscription.id)}
-                                disabled={actionLoading === subscription.id}
-                              >
-                                {actionLoading === subscription.id ? (
-                                  <div className="flex items-center gap-2">
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                    Reactivating...
-                                  </div>
-                                ) : (
-                                  'Reactivate'
-                                )}
-                              </Button>
-                            )}
-                            <Button variant="outline" size="sm" className="rounded-full bg-transparent">
-                              Change Plan
-                            </Button>
-                          </div>
+                            </div>
                           </div>
                         </div>
                       </CardContent>

@@ -220,8 +220,8 @@ public class ReportManager : DomainService, IReportManager
 
     public async Task<Byte[]> GenerateMonthlySummaryReportAsync(ReportTypes reportType, DateTime startDate, DateTime endDate)
     {
-        var reportTemplate2 = await _reportTemplateRepository.FirstOrDefaultAsync(rt => rt.ReportType == reportType);
-        if (reportTemplate2 == null)
+        var reportTemplate = await _reportTemplateRepository.FirstOrDefaultAsync(rt => rt.ReportType == reportType);
+        if (reportTemplate == null)
         {
             throw new UserFriendlyException($"No report template found for report type: {reportType}");
         }
@@ -243,13 +243,13 @@ public class ReportManager : DomainService, IReportManager
         };
         
         // Use Scriban to render the template from database
-        var template = Template.Parse(reportTemplate2.Format);
+        var template = Template.Parse(reportTemplate.Format);
         var reportContent = template.Render(templateData);
         
         var report = new Report(
             _guidGenerator.Create(),
-            reportTemplate2.Id,
-            reportTemplate2.Name,
+            reportTemplate.Id,
+            reportTemplate.Name,
             reportContent,
             DateTime.UtcNow
         );
@@ -263,7 +263,7 @@ public class ReportManager : DomainService, IReportManager
         
     }
     
-    public async Task<Byte[]> GeneratePdfReportAsync(Report report)
+    private async Task<Byte[]> GeneratePdfReportAsync(Report report)
     {
         try
         {

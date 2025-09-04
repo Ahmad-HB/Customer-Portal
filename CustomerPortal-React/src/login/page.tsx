@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "@/contexts/AuthContext"
+import { useCurrentUserRole } from "@/hooks/useAbpApi"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,9 +20,10 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, isAuthenticated, user, isLoading: authLoading } = useAuth()
+  const { role: currentRole, isLoading: roleLoading, isAdmin, isCustomer, isTechnician, isSupportAgent } = useCurrentUserRole()
 
-  // Check for remembered user on component mount
+  // Check for remembered user on component mount and redirect if already authenticated
   useEffect(() => {
     const rememberedUser = localStorage.getItem('remembered_user')
     const isRemembered = localStorage.getItem('remember_me') === 'true'
@@ -30,7 +32,25 @@ export default function LoginPage() {
       setUsernameOrEmail(rememberedUser)
       setRememberMe(true)
     }
-  }, [])
+    
+    // If user is already authenticated and role is determined, redirect them to appropriate page
+    if (isAuthenticated && user && !authLoading && !roleLoading && currentRole) {
+      console.log('User already authenticated, redirecting based on role:', currentRole)
+      
+      if (isAdmin) {
+        navigate('/admin/dashboard')
+      } else if (isTechnician) {
+        navigate('/technician/assigned-tickets')
+      } else if (isSupportAgent) {
+        navigate('/support/profile')
+      } else if (isCustomer) {
+        navigate('/customer/dashboard')
+      } else {
+        // Fallback to profile page
+        navigate('/profile')
+      }
+    }
+  }, [isAuthenticated, user, authLoading, roleLoading, currentRole, isAdmin, isCustomer, isTechnician, isSupportAgent, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,10 +62,17 @@ export default function LoginPage() {
       
       if (success) {
         // Login successful, redirect based on role
-        if (usernameOrEmail.includes("technician")) {
+        if (isTechnician) {
           navigate("/technician/assigned-tickets")
+        } else if (isSupportAgent) {
+          navigate("/support/profile")
+        } else if (isAdmin) {
+          navigate("/admin/dashboard")
+        } else if (isCustomer) {
+          navigate("/customer/dashboard")
         } else {
-          navigate("/")
+          // Fallback to profile page
+          navigate("/profile")
         }
       } else {
         setError("Invalid username/email or password")
@@ -55,6 +82,24 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Show loading spinner while checking authentication or role
+  if (authLoading || roleLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <LoadingSpinner text="Checking authentication..." />
+      </div>
+    )
+  }
+
+  // If already authenticated, show loading while redirecting
+  if (isAuthenticated && user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <LoadingSpinner text="Redirecting..." />
+      </div>
+    )
   }
 
   return (

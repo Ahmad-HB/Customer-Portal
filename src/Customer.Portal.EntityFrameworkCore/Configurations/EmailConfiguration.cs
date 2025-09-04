@@ -13,25 +13,21 @@ public class EmailConfiguration : IEntityTypeConfiguration<Email>
         builder.ConfigureByConvention();
 
         builder.Property(x => x.Subject)
-            .IsRequired()
-            .HasMaxLength(256);
+            .IsRequired();
 
         builder.Property(x => x.Body)
-            .IsRequired()
-            .HasMaxLength(2048);
+            .IsRequired();
 
         builder.Property(x => x.EmailAddress)
-            .IsRequired()
-            .HasMaxLength(256);
+            .IsRequired();
 
         builder.Property(x => x.SentAt)
             .IsRequired()
             .HasColumnType("datetime");
 
         builder.Property(x => x.IsSuccess);
-        
-        builder.Property(x => x.ErrorMessage)
-            .HasMaxLength(512);
+
+        builder.Property(x => x.ErrorMessage);
         
         builder.HasOne(x => x.IdentityUser)
             .WithMany()

@@ -2,7 +2,9 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Customer.Portal.Entities;
+using Customer.Portal.Enums;
 using Customer.Portal.FeaturesManagers.MAppUser;
+using Customer.Portal.FeaturesManagers.MEmail;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Data;
@@ -31,6 +33,9 @@ public class UserHandler : ILocalEventHandler<EntityCreatedEventData<IdentityUse
     private readonly IRepository<OrganizationUnit, Guid> _organizationUnitRepository;
     private readonly IRepository<IdentityRole, Guid> _identityRoleRepository;
     private readonly ILogger<IdentityUserManager> _identityUserLogger;
+    private readonly IEmailManager _emailManager;
+    private readonly IRepository<EmailTemplate, Guid> _emailTemplateRepository;
+    private readonly ILogger<UserHandler> _logger;
 
 
     #endregion
@@ -38,7 +43,7 @@ public class UserHandler : ILocalEventHandler<EntityCreatedEventData<IdentityUse
 
     #region Ctor
 
-    public UserHandler(Lazy<IdentityUserManager> identityUserManager, Lazy<AppUserManager> appUserManager, Lazy<OrganizationUnitManager> organizationUnitManager, IRepository<OrganizationUnit, Guid> organizationUnitRepository, IRepository<IdentityUser, Guid> identityUserRepository, IRepository<IdentityRole, Guid> identityRoleRepository, ILogger<IdentityUserManager> identityUserLogger)
+    public UserHandler(Lazy<IdentityUserManager> identityUserManager, Lazy<AppUserManager> appUserManager, Lazy<OrganizationUnitManager> organizationUnitManager, IRepository<OrganizationUnit, Guid> organizationUnitRepository, IRepository<IdentityUser, Guid> identityUserRepository, IRepository<IdentityRole, Guid> identityRoleRepository, ILogger<IdentityUserManager> identityUserLogger, IEmailManager emailManager, IRepository<EmailTemplate, Guid> emailTemplateRepository, ILogger<UserHandler> logger)
     {
         _identityUserManager = identityUserManager;
         _appUserManager = appUserManager;
@@ -47,6 +52,9 @@ public class UserHandler : ILocalEventHandler<EntityCreatedEventData<IdentityUse
         _identityUserRepository = identityUserRepository;
         _identityRoleRepository = identityRoleRepository;
         _identityUserLogger = identityUserLogger;
+        _emailManager = emailManager;
+        _emailTemplateRepository = emailTemplateRepository;
+        _logger = logger;
     }
 
     #endregion
@@ -57,6 +65,7 @@ public class UserHandler : ILocalEventHandler<EntityCreatedEventData<IdentityUse
         var identityUser = eventData.Entity;
         var tenantId = eventData.Entity.TenantId;
         
+        
         await _appUserManager.Value.RegisterAppUserAsync(identityUser, tenantId);
         
     }
@@ -66,9 +75,15 @@ public class UserHandler : ILocalEventHandler<EntityCreatedEventData<IdentityUse
         var appUser = eventData.Entity;
         var identityUserId = eventData.Entity.IdentityUserId;
         
+        
         await _appUserManager.Value.CompleteAppUserRegisterAsync(appUser.Id, appUser.UserType);
         
-        var identityUser = await _identityUserManager.Value.GetByIdAsync(identityUserId);
+        var identityUser = await _identityUserRepository.FirstOrDefaultAsync(u => u.Id == identityUserId);
+        if (identityUser == null)
+        {
+            _logger.LogError("IdentityUser with ID {IdentityUserId} not found when trying to send registration email", identityUserId);
+            return;
+        }
         
         var query = await _identityUserRepository.GetQueryableAsync();
         
@@ -76,21 +91,34 @@ public class UserHandler : ILocalEventHandler<EntityCreatedEventData<IdentityUse
             .ExecuteUpdateAsync(u => 
                 u.SetProperty<Guid>(user => EF.Property<Guid>(user, "AppUserId"), appUser.Id));
         
-        var roleId = await _identityRoleRepository.FirstOrDefaultAsync(x => x.Name == "Customer");
+        // var roleId = await _identityRoleRepository.FirstOrDefaultAsync(x => x.Name == "Customer");
         
         // identityUser.AddRole(Guid.Parse("3a1bd314-4d03-fe19-9a6b-b33550f93128"));
-        if (roleId != null)
+        // if (roleId != null)
+        // {
+        //     identityUser.AddRole(roleId.Id);
+        // }
+        // else
+        // {
+        //     _identityUserLogger.LogWarning("Role 'Customer' not found. Cannot assign role to user {UserId}", identityUserId);
+        // }
+        //
+        // _identityUserLogger.LogInformation("User {UserId} assigned role {RoleId}", identityUserId, roleId);
+
+        await _identityUserRepository.UpdateAsync(identityUser);
+        
+        // Check if email templates exist before trying to send emails
+        var customerRegistrationTemplate = await _emailTemplateRepository.FirstOrDefaultAsync(et => et.EmailType == EmailType.CustomerRegistration);
+        if (customerRegistrationTemplate != null)
         {
-            identityUser.AddRole(roleId.Id);
+            
+            await _emailManager.SendCustomerRegistrationEmailAsync(identityUser.Email, identityUser.Id);
+            _logger.LogInformation("Customer registration email process completed for user {UserId}", identityUser.Id);
         }
         else
         {
-            _identityUserLogger.LogWarning("Role 'Customer' not found. Cannot assign role to user {UserId}", identityUserId);
+            _logger.LogWarning("Customer registration email template not found. Skipping email for user {UserId}", identityUser.Id);
         }
-        
-        _identityUserLogger.LogInformation("User {UserId} assigned role {RoleId}", identityUserId, roleId);
-
-        await _identityUserRepository.UpdateAsync(identityUser);
         
     }
 }

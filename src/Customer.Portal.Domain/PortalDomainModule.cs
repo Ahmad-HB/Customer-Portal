@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Customer.Portal.Localization;
 using Customer.Portal.MultiTenancy;
+using MailKit.Security;
 using Volo.Abp.Localization;
 using Volo.Abp.Modularity;
 using Volo.Abp.MultiTenancy;
@@ -14,6 +15,7 @@ using Volo.Abp.PermissionManagement.OpenIddict;
 using Volo.Abp.AuditLogging;
 using Volo.Abp.BackgroundJobs;
 using Volo.Abp.Emailing;
+using Volo.Abp.MailKit;
 using Volo.Abp.FeatureManagement;
 using Volo.Abp.Identity;
 using Volo.Abp.TenantManagement;
@@ -32,6 +34,7 @@ namespace Customer.Portal;
     typeof(AbpPermissionManagementDomainOpenIddictModule),
     typeof(AbpSettingManagementDomainModule),
     typeof(AbpEmailingModule),
+    typeof(AbpMailKitModule),
     typeof(AbpIdentityDomainModule),
     typeof(AbpOpenIddictDomainModule),
     typeof(AbpTenantManagementDomainModule),
@@ -77,7 +80,8 @@ public class PortalDomainModule : AbpModule
         
 
 #if DEBUG
-        context.Services.Replace(ServiceDescriptor.Singleton<IEmailSender, NullEmailSender>());
+        // Email service is now enabled with MailKit
+        // context.Services.Replace(ServiceDescriptor.Singleton<IEmailSender, NullEmailSender>());
 #endif
     }
 }

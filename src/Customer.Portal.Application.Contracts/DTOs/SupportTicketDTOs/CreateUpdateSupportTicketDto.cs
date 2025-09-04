@@ -5,7 +5,6 @@ namespace Customer.Portal.DTOs.SupportTicketDTOs;
 
 public class CreateUpdateSupportTicketDto : EntityDto<Guid>
 {
-    
     public Guid ServicePlanId { get; set; }
     
     public string Subject { get; set; }

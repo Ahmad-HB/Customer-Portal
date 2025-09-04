@@ -23,8 +23,6 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
 
     private readonly IRepository<SupportTicket, Guid> _supportTicketRepository;
     private readonly IRepository<IdentityUser, Guid> _identityUserRepository;
-    // private readonly IRepository<IdentityRole, Guid> _identityRoleRepository;
-    // private readonly IRepository<IdentityUserRole> _identityUserRoleRepository;
     private readonly IRepository<AppUser, Guid> _appUserRepository;
     private readonly IGuidGenerator _guidGenerator;
     private readonly ITicketCommentManager _ticketCommentManager;
@@ -41,8 +39,6 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
         _supportTicketRepository = supportTicketRepository;
         _identityUserRepository = userRepository;
         _guidGenerator = guidGenerator;
-        // _identityRoleRepository = identityRoleRepository;
-        // _identityUserRoleRepository = identityUserRoleRepository;
         _appUserRepository = appUserRepository;
         _ticketCommentManager = ticketCommentManager;
     }
@@ -53,32 +49,44 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
 
     public async Task CreateSupportTicketAsync(SupportTicket supportTicket, Guid identityUserId)
     {
-        var query = await _identityUserRepository.GetQueryableAsync();
-        var identityUser = await _identityUserRepository.GetAsync(identityUserId);
+        try
+        {
+            var query = await _identityUserRepository.GetQueryableAsync();
+            var identityUser = await _identityUserRepository.GetAsync(identityUserId);
 
-        var appUserId = await query
-            .Where(u => u.Id == identityUserId)
-            .Select(u => EF.Property<Guid>(u, "AppUserId"))
-            .FirstOrDefaultAsync();
+            var appUserId = await query
+                .Where(u => u.Id == identityUserId)
+                .Select(u => EF.Property<Guid>(u, "AppUserId"))
+                .FirstOrDefaultAsync();
 
-        supportTicket.AppUserId = appUserId;
-        supportTicket.Status = TicketStatus.Open;
-        supportTicket.CreatedAt = DateTime.UtcNow;
+            var appUser = await _appUserRepository.GetAsync(appUserId);
+            if (appUser == null)
+            {
+                throw new UserFriendlyException("App user not found.");
+            }
 
-        var supportTicket2 = new SupportTicket(
-            _guidGenerator.Create(),
-            appUserId,
-            supportTicket.ServicePlanId,
-            supportTicket.Subject,
-            supportTicket.Description
-        );
+            supportTicket.AppUserId = appUserId;
+            supportTicket.Status = TicketStatus.Open;
+            supportTicket.CreatedAt = DateTime.UtcNow;
 
-        await _supportTicketRepository.InsertAsync(supportTicket2);
+            var supportTicket2 = new SupportTicket(
+                _guidGenerator.Create(),
+                appUserId,
+                supportTicket.ServicePlanId,
+                supportTicket.Subject,
+                supportTicket.Description
+            );
+
+            await _supportTicketRepository.InsertAsync(supportTicket2);
+            
+            // await AssignSupportAgentAsync(supportTicket2.Id);
+
+        }
+        catch (Exception ex)
+        {
+            throw new UserFriendlyException(ex.Message);
+        }
         
-
-        // Send notification to support team about the new ticket
-
-        await AssignSupportAgentAsync(supportTicket2.Id);
     }
 
     public async Task<SupportTicket> GetSupportTicketByIdAsync(Guid supportTicketId)
@@ -87,7 +95,7 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
         var supportTicket = await AsyncExecuter.FirstOrDefaultAsync(query
             .Where(s => s.Id == supportTicketId)
             .Include(x => x.Supportagent)
-            .Include(x => x.AppUserId)
+            .Include(x => x.AppUser)
             .Include(x => x.Technician)
             .Include(x => x.TicketComments));
         if (supportTicket == null)
@@ -145,8 +153,8 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
 
     public async Task AssignSupportAgentAsync(Guid supportTicketId)
     {
-        var supportTicket = await _supportTicketRepository.GetAsync(supportTicketId);
         var query = await _appUserRepository.GetQueryableAsync();
+        var supportTicket = await _supportTicketRepository.FirstOrDefaultAsync(x => x.Id == supportTicketId);
         if (supportTicket == null)
         {
             throw new UserFriendlyException("Support ticket not found.");
@@ -176,7 +184,7 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
 
         // Notify the assigned agent about the new ticket assignment
 
-        await UpdateTicketStatusAsync(supportTicket.Id, TicketStatus.Closed);
+        await UpdateTicketStatusAsync(supportTicket.Id, TicketStatus.InProgress);
     }
 
     public async Task AssignTechnicianAsync(Guid supportTicketId, Guid technicianId)

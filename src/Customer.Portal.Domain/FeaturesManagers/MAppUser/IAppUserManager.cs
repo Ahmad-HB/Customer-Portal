@@ -17,6 +17,10 @@ public interface IAppUserManager : IDomainService
     
     public Task<AppUser> GetUserByIdAsync(Guid id);
     
+    public Task<AppUser> GetCurrentAppUserAsync(Guid identityUserId);
+    
+    public Task GetCurrentUserRoleAsync(Guid identityUserId);
+    
     
     
 }

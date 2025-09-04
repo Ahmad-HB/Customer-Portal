@@ -1,45 +1,33 @@
 import { Link, useLocation } from "react-router-dom"
-import { useAuth } from '@/contexts/AuthContext'
 import { 
   Home, 
-  Package, 
-  User, 
   Ticket, 
-  LogOut, 
-  UserCircle, 
+  Package, 
   Wrench, 
-  BarChart3,
-  Users,
-  Settings
-} from "lucide-react"
+  Users, 
+  UserCircle, 
+  LogOut 
+} from 'lucide-react'
 import { cn } from "@/lib/utils"
-import { SessionStatusIndicator } from './SessionStatusIndicator'
+import { useAuth } from "@/contexts/AuthContext"
+import { useCurrentUserRole } from "@/hooks/useAbpApi"
 
-// Define navigation items for each role
+// Navigation items for each role - only show what each role should access
 const navigationByRole = {
   customer: [
-    { name: "Dashboard", href: "/", icon: Home },
-    { name: "Profile", href: "/profile", icon: User },
+    { name: "Dashboard", href: "/customer/dashboard", icon: Home },
     { name: "Tickets", href: "/tickets", icon: Ticket },
     { name: "Plans", href: "/plans", icon: Package },
   ],
   technician: [
-    { name: "Dashboard", href: "/technician/assigned-tickets", icon: Home },
     { name: "Assigned Tickets", href: "/technician/assigned-tickets", icon: Wrench },
-    { name: "Profile", href: "/technician/profile", icon: User },
   ],
   supportAgent: [
-    { name: "Dashboard", href: "/support/dashboard", icon: Home },
     { name: "Assigned Tickets", href: "/support/assigned-tickets", icon: Ticket },
-    { name: "Reports", href: "/support/reports", icon: BarChart3 },
-    { name: "Profile", href: "/support/profile", icon: User },
   ],
   admin: [
     { name: "Dashboard", href: "/admin/dashboard", icon: Home },
-    { name: "Reports", href: "/admin/reports", icon: BarChart3 },
     { name: "Users", href: "/admin/users", icon: Users },
-    { name: "Settings", href: "/admin/settings", icon: Settings },
-    { name: "Profile", href: "/admin/profile", icon: User },
   ],
 }
 
@@ -53,25 +41,49 @@ const profileLinksByRole = {
 
 export function SidebarNav() {
   const location = useLocation()
-  const { logout } = useAuth()
+  const { logout, checkSession } = useAuth()
+  const { isLoading: roleLoading, isAdmin, isCustomer, isTechnician, isSupportAgent } = useCurrentUserRole()
 
-  // TODO: This should come from your authentication context/API
-  // For now, we'll determine role based on current path
-  const getCurrentRole = (): 'customer' | 'technician' | 'supportAgent' | 'admin' => {
-    const path = location.pathname
-    if (path.startsWith('/admin')) return 'admin'
-    if (path.startsWith('/support')) return 'supportAgent'
-    if (path.startsWith('/technician')) return 'technician'
-    return 'customer'
-  }
+  // Simple role determination
+  let effectiveRole: keyof typeof navigationByRole = 'customer'
+  
+  if (isAdmin) effectiveRole = 'admin'
+  else if (isTechnician) effectiveRole = 'technician'
+  else if (isSupportAgent) effectiveRole = 'supportAgent'
+  else if (isCustomer) effectiveRole = 'customer'
 
-  const currentRole = getCurrentRole()
-  const navigation = navigationByRole[currentRole]
-  const profileLink = profileLinksByRole[currentRole]
+  // Get navigation and profile link
+  const navigation = navigationByRole[effectiveRole] || []
+  const profileLink = profileLinksByRole[effectiveRole] || "/profile"
+
+  // DEBUG: Log what's happening in the sidebar
+  console.log('🔍 [Sidebar] Debug Info:', {
+    effectiveRole,
+    navigationItems: navigation?.map(item => item.name),
+    isAdmin,
+    isCustomer,
+    isTechnician,
+    isSupportAgent,
+    roleLoading,
+    currentPath: location.pathname
+  })
 
   const handleLogout = async () => {
+    if (checkSession) {
+      checkSession()
+    }
     await logout()
-    // logout() already handles navigation, so we don't need to navigate here
+  }
+
+  // Show loading state while role is being determined
+  if (roleLoading) {
+    return (
+      <div className="flex h-full w-20 flex-col bg-sidebar border-r border-sidebar-border">
+        <div className="flex flex-col items-center justify-center flex-1">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -83,6 +95,11 @@ export function SidebarNav() {
             <Link
               key={item.name}
               to={item.href}
+              onClick={() => {
+                if (checkSession) {
+                  checkSession()
+                }
+              }}
               className={cn(
                 "flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-200 hover:scale-110 active:scale-95 hover:shadow-sm",
                 isActive
@@ -98,13 +115,13 @@ export function SidebarNav() {
       </div>
 
       <div className="flex flex-col items-center space-y-4 pb-6">
-        {/* Session Status Indicator */}
-        <div className="px-2">
-          <SessionStatusIndicator />
-        </div>
-
         <Link
           to={profileLink}
+          onClick={() => {
+            if (checkSession) {
+              checkSession()
+            }
+          }}
           className="flex h-12 w-12 items-center justify-center rounded-full bg-sidebar-accent hover:bg-sidebar-primary transition-all duration-200 hover:scale-110 active:scale-95 hover:shadow-md"
         >
           <UserCircle className="h-8 w-8 text-sidebar-foreground" />

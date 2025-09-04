@@ -34,6 +34,10 @@ public class ReportTemplateDataSeedContributor : IDataSeedContributor, ITransien
 
     public async Task SeedAsync(DataSeedContext context)
     {
+        if (await _reportTemplateRepository.GetCountAsync() > 0)
+        {
+            return;
+        }
         var reportTemplatelist = new List<ReportTemplate>
         {
             new ReportTemplate(

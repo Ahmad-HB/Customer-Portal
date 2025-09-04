@@ -50,12 +50,13 @@ public class IdentityUserDataSeedContributor : IDataSeedContributor, ITransientD
 
     public async Task SeedAsync(DataSeedContext context)
     {
+        
         using var uow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
         
         try
         {
             // Create roles first
-            // await CreateRolesAsync();
+            await CreateRolesAsync();
             
             // Create users with their respective roles
             await CreateUsersAsync();
@@ -69,26 +70,26 @@ public class IdentityUserDataSeedContributor : IDataSeedContributor, ITransientD
         }
     }
 
-    // private async Task CreateRolesAsync()
-    // {
-    //     var roles = new[] { "Admin", "Customer", "SupportAgent", "Technician" };
-    //
-    //     foreach (var roleName in roles)
-    //     {
-    //         var existingRole = await _identityRoleRepository.FirstOrDefaultAsync(r => r.Name == roleName);
-    //         if (existingRole == null)
-    //         {
-    //             var role = new IdentityRole(_guidGenerator.Create(), roleName);
-    //             await _roleManager.CreateAsync(role);
-    //         }
-    //     }
-    // }
+    private async Task CreateRolesAsync()
+    {
+        var roles = new[] { "Customer", "SupportAgent", "Technician" };
+
+        foreach (var roleName in roles)
+        {
+            var existingRole = await _identityRoleRepository.FirstOrDefaultAsync(r => r.Name == roleName);
+            if (existingRole == null)
+            {
+                var role = new IdentityRole(_guidGenerator.Create(), roleName);
+                role.IsPublic = true;
+                role.IsStatic = true;
+                await _roleManager.CreateAsync(role);
+            }
+        }
+    }
 
     private async Task CreateUsersAsync()
     {
-        // Create Admin User (1 user)
-        await CreateAdminUserAsync();
-
+        // Admin User is now handled by CustomIdentityDataSeedContributor
         // Create Support Agents (4 users)
         await CreateSupportAgentsAsync();
 
@@ -99,49 +100,15 @@ public class IdentityUserDataSeedContributor : IDataSeedContributor, ITransientD
         await CreateCustomersAsync();
     }
 
-    private async Task CreateAdminUserAsync()
-    {
-        var adminEmail = "admin@customerportal.com";
-        var existingAdmin = await _identityUserRepository.FirstOrDefaultAsync(u => u.Email == adminEmail);
-        
-        if (existingAdmin == null)
-        {
-            var adminUser = new IdentityUser(_guidGenerator.Create(), "admin", adminEmail);
-            adminUser.SetPhoneNumber("+1234567890", false);
-            adminUser.Name = "System Administrator";
-            
-            await _userManager.CreateAsync(adminUser, "Admin123!");
-            
-            // Create AppUser record directly (bypassing event handler)
-            // var appUser = new AppUser(
-            //     _guidGenerator.Create(),
-            //     "System Administrator",
-            //     adminEmail,
-            //     "+1234567890",
-            //     true,
-            //     UserType.Admin,
-            //     adminUser.Id
-            // );
-            //
-            // await _appUserRepository.InsertAsync(appUser);
-            
-            // Assign Admin role directly
-            var adminRole = await _identityRoleRepository.FirstOrDefaultAsync(r => r.Name == "Admin");
-            if (adminRole != null)
-            {
-                await _userManager.AddToRoleAsync(adminUser, adminRole.Name);
-            }
-        }
-    }
 
     private async Task CreateSupportAgentsAsync()
     {
         var supportAgents = new[]
         {
-            new { Name = "Sarah Johnson", Email = "sarah.johnson@customerportal.com", Phone = "+1234567891" },
-            new { Name = "Michael Chen", Email = "michael.chen@customerportal.com", Phone = "+1234567892" },
-            new { Name = "Emily Rodriguez", Email = "emily.rodriguez@customerportal.com", Phone = "+1234567893" },
-            new { Name = "David Thompson", Email = "david.thompson@customerportal.com", Phone = "+1234567894" }
+            new { Name = "Sarah Johnson", Email = "sarah.johnson@support.com", Phone = "+1234567891" },
+            new { Name = "Michael Chen", Email = "michael.chen@support.com", Phone = "+1234567892" },
+            new { Name = "Emily Rodriguez", Email = "emily.rodriguez@support.com", Phone = "+1234567893" },
+            new { Name = "David Thompson", Email = "david.thompson@support.com", Phone = "+1234567894" }
         };
 
         foreach (var agent in supportAgents)
@@ -152,7 +119,7 @@ public class IdentityUserDataSeedContributor : IDataSeedContributor, ITransientD
             {
                 var userName = agent.Email.Split('@')[0];
                 var user = new IdentityUser(_guidGenerator.Create(), userName, agent.Email);
-                user.SetPhoneNumber(agent.Phone, false);
+                user.SetPhoneNumber(agent.Phone, true);
                 user.Name = agent.Name;
                 
                 await _userManager.CreateAsync(user, "Support123!");
@@ -184,10 +151,10 @@ public class IdentityUserDataSeedContributor : IDataSeedContributor, ITransientD
     {
         var technicians = new[]
         {
-            new { Name = "Alex Martinez", Email = "alex.martinez@customerportal.com", Phone = "+1234567895" },
-            new { Name = "Lisa Wang", Email = "lisa.wang@customerportal.com", Phone = "+1234567896" },
-            new { Name = "James Wilson", Email = "james.wilson@customerportal.com", Phone = "+1234567897" },
-            new { Name = "Maria Garcia", Email = "maria.garcia@customerportal.com", Phone = "+1234567898" }
+            new { Name = "Alex Martinez", Email = "alex.martinez@technician.com", Phone = "+1234567895" },
+            new { Name = "Lisa Wang", Email = "lisa.wang@technician.com", Phone = "+1234567896" },
+            new { Name = "James Wilson", Email = "james.wilson@technician.com", Phone = "+1234567897" },
+            new { Name = "Maria Garcia", Email = "maria.garcia@technician.com", Phone = "+1234567898" }
         };
 
         foreach (var technician in technicians)
@@ -198,7 +165,7 @@ public class IdentityUserDataSeedContributor : IDataSeedContributor, ITransientD
             {
                 var userName = technician.Email.Split('@')[0];
                 var user = new IdentityUser(_guidGenerator.Create(), userName, technician.Email);
-                user.SetPhoneNumber(technician.Phone, false);
+                user.SetPhoneNumber(technician.Phone, true);
                 user.Name = technician.Name;
                 
                 await _userManager.CreateAsync(user, "Tech123!");
@@ -230,14 +197,14 @@ public class IdentityUserDataSeedContributor : IDataSeedContributor, ITransientD
     {
         var customers = new[]
         {
-            new { Name = "John Smith", Email = "john.smith@example.com", Phone = "+1234567901" },
-            new { Name = "Jane Doe", Email = "jane.doe@example.com", Phone = "+1234567902" },
-            new { Name = "Robert Brown", Email = "robert.brown@example.com", Phone = "+1234567903" },
-            new { Name = "Alice Johnson", Email = "alice.johnson@example.com", Phone = "+1234567904" },
-            new { Name = "Charlie Davis", Email = "charlie.davis@example.com", Phone = "+1234567905" },
-            new { Name = "Diana Miller", Email = "diana.miller@example.com", Phone = "+1234567906" },
-            new { Name = "Edward Wilson", Email = "edward.wilson@example.com", Phone = "+1234567907" },
-            new { Name = "Fiona Taylor", Email = "fiona.taylor@example.com", Phone = "+1234567908" }
+            new { Name = "John Smith", Email = "john.smith@customer.com", Phone = "+1234567901" },
+            new { Name = "Jane Doe", Email = "jane.doe@customer.com", Phone = "+1234567902" },
+            new { Name = "Robert Brown", Email = "robert.brown@customer.com", Phone = "+1234567903" },
+            new { Name = "Alice Johnson", Email = "alice.johnson@customer.com", Phone = "+1234567904" },
+            new { Name = "Charlie Davis", Email = "charlie.davis@customer.com", Phone = "+1234567905" },
+            new { Name = "Diana Miller", Email = "diana.miller@customer.com", Phone = "+1234567906" },
+            new { Name = "Edward Wilson", Email = "edward.wilson@customer.com", Phone = "+1234567907" },
+            new { Name = "Fiona Taylor", Email = "fiona.taylor@customer.com", Phone = "+1234567908" }
         };
 
         foreach (var customer in customers)
@@ -248,7 +215,7 @@ public class IdentityUserDataSeedContributor : IDataSeedContributor, ITransientD
             {
                 var userName = customer.Email.Split('@')[0];
                 var user = new IdentityUser(_guidGenerator.Create(), userName, customer.Email);
-                user.SetPhoneNumber(customer.Phone, false);
+                user.SetPhoneNumber(customer.Phone, true);
                 user.Name = customer.Name;
                 
                 await _userManager.CreateAsync(user, "Customer123!");

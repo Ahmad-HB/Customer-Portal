@@ -250,3 +250,169 @@ export function useAbpTicketCrud() {
     apiClient.deleteTicket
   )
 }
+
+// Current App User hook for role-based access control
+export function useCurrentAppUser() {
+  const [appUser, setAppUser] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchAppUser = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        
+        const response = await apiClient.getCurrentAppUser()
+        
+        if (response.success && response.data) {
+          setAppUser(response.data)
+        } else {
+          setError(response.message || 'Failed to get app user')
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchAppUser()
+  }, [])
+
+  const isAdmin = appUser?.userType === 1 // UserType.Admin
+  const isCustomer = appUser?.userType === 2 // UserType.Customer
+  const isSupportAgent = appUser?.userType === 3 // UserType.SupportAgent
+  const isTechnician = appUser?.userType === 4 // UserType.Technician
+
+  return {
+    appUser,
+    isLoading,
+    error,
+    isAdmin,
+    isCustomer,
+    isSupportAgent,
+    isTechnician,
+    refetch: () => {
+      setIsLoading(true)
+      setError(null)
+      apiClient.getCurrentAppUser().then(response => {
+        if (response.success && response.data) {
+          setAppUser(response.data)
+        } else {
+          setError(response.message || 'Failed to get app user')
+        }
+        setIsLoading(false)
+      }).catch(err => {
+        setError(err instanceof Error ? err.message : 'An error occurred')
+        setIsLoading(false)
+      })
+    }
+  }
+}
+
+// Current User Role hook that always returns a true role
+export function useCurrentUserRole() {
+  const [roleData, setRoleData] = useState<{ role: string; userType: number } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        
+        console.log('🔍 [useCurrentUserRole] Fetching user role...')
+        const response = await apiClient.getCurrentUserRole()
+        
+        console.log('🔍 [useCurrentUserRole] API Response:', response)
+        
+        if (response.success && response.data) {
+          setRoleData(response.data)
+          console.log('🔍 [useCurrentUserRole] Role data set:', response.data)
+        } else {
+          setError(response.message || 'Failed to get user role')
+          console.error('🔍 [useCurrentUserRole] API failed:', response.message)
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred'
+        setError(errorMessage)
+        console.error('🔍 [useCurrentUserRole] API error:', errorMessage)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchUserRole()
+  }, [])
+
+  // Handle the string response from the new API endpoint
+  // The API returns "admin", "customer", "technician", "supportAgent"
+  const currentRole = roleData?.role || null
+  const currentUserType = roleData?.userType || null
+
+  // Convert string role to numeric userType for compatibility
+  const roleToUserType: Record<string, number> = {
+    'admin': 1,
+    'customer': 2,
+    'supportAgent': 3,
+    'technician': 4,
+    // Also handle the exact case from the API
+    'SupportAgent': 3,
+    'Admin': 1,
+    'Customer': 2,
+    'Technician': 4
+  }
+
+  // PRIORITY: Use the string role from API as the source of truth
+  // If the API returns a string role, use that instead of userType
+  // This fixes the issue where userType might be incorrect
+  const effectiveUserType = currentRole ? roleToUserType[currentRole] || roleToUserType[currentRole.toLowerCase()] : currentUserType
+
+  // Only set boolean flags if we have a valid role
+  const isAdmin = effectiveUserType === 1
+  const isCustomer = effectiveUserType === 2
+  const isSupportAgent = effectiveUserType === 3
+  const isTechnician = effectiveUserType === 4
+
+  // DEBUG: Log what the hook is returning
+  console.log('🔍 [useCurrentUserRole] Hook Debug:', {
+    roleData,
+    currentRole,
+    currentUserType,
+    effectiveUserType,
+    isAdmin,
+    isCustomer,
+    isSupportAgent,
+    isTechnician,
+    apiResponse: roleData,
+    timestamp: new Date().toISOString()
+  })
+
+  return {
+    role: currentRole,
+    userType: effectiveUserType,
+    isLoading,
+    error,
+    isAdmin,
+    isCustomer,
+    isSupportAgent,
+    isTechnician,
+    refetch: () => {
+      setIsLoading(true)
+      setError(null)
+      apiClient.getCurrentUserRole().then(response => {
+        if (response.success && response.data) {
+          setRoleData(response.data)
+        } else {
+          setError(response.message || 'Failed to get user role')
+        }
+        setIsLoading(false)
+      }).catch(err => {
+        setError(err instanceof Error ? err.message : 'An error occurred')
+        setIsLoading(false)
+      })
+    }
+  }
+}

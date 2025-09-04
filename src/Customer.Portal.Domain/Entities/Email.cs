@@ -27,7 +27,7 @@ public class Email : FullAuditedEntity<Guid>
     public string ErrorMessage { get; set; }
 
 
-    public Email(Guid id, Guid identityUserId, Guid emailTemplateId, string emailAddress, string subject, string body, DateTime sentAt, bool isSuccess)
+    public Email(Guid id, Guid identityUserId, Guid emailTemplateId, string emailAddress, string subject, string body, DateTime sentAt, bool isSuccess = false, string errorMessage = null)
         : base(id)
     {
         IdentityUserId = identityUserId;
@@ -37,5 +37,6 @@ public class Email : FullAuditedEntity<Guid>
         Body = body;
         SentAt = sentAt;
         IsSuccess = isSuccess;
+        ErrorMessage = errorMessage;
     }
 }

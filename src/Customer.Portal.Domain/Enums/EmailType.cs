@@ -4,5 +4,6 @@ public enum EmailType
 {
     TicketCreated = 1,
     TicketUpdated = 2,
-    CustomerRegistration = 3,
+    Confirmation = 3,
+    CustomerRegistration = 4,
 }

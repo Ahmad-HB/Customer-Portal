@@ -2,21 +2,24 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { User } from "lucide-react"
+import { User, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/contexts/AuthContext"
 
 export default function TechnicianProfilePage() {
+  const { user } = useAuth()
+  
   const [formData, setFormData] = useState({
     name: "",
     surname: "",
     username: "",
     email: "",
     phone: "",
-    address: "",
+    role: "",
   })
 
   const [originalData, setOriginalData] = useState({
@@ -25,24 +28,26 @@ export default function TechnicianProfilePage() {
     username: "",
     email: "",
     phone: "",
-    address: "",
+    role: "",
   })
 
   const [hasChanges, setHasChanges] = useState(false)
 
-  // Initialize with sample data (in real app, this would come from API)
+  // Initialize with real user data from backend
   useEffect(() => {
-    const initialData = {
-      name: "Mike",
-      surname: "Technician",
-      username: "miketechnician",
-      email: "mike.technician@example.com",
-      phone: "+1 555 123 4567",
-      address: "456 Tech Ave, Service City, State 54321",
+    if (user) {
+      const userData = {
+        name: user.name || "",
+        surname: "", // Backend doesn't seem to have surname
+        username: user.username || "",
+        email: user.email || "",
+        phone: user.phone || "",
+        role: user.role || "",
+      }
+      setFormData(userData)
+      setOriginalData(userData)
     }
-    setFormData(initialData)
-    setOriginalData(initialData)
-  }, [])
+  }, [user])
 
   // Check for changes whenever formData changes
   useEffect(() => {
@@ -53,6 +58,9 @@ export default function TechnicianProfilePage() {
   }, [formData, originalData])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Don't allow changes to the role field
+    if (e.target.name === 'role') return
+    
     setFormData((prev) => ({
       ...prev,
       [e.target.name]: e.target.value,
@@ -168,14 +176,19 @@ export default function TechnicianProfilePage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="role" className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Role
+              </Label>
               <Input
-                id="address"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                className="rounded-full"
+                id="role"
+                name="role"
+                value={formData.role}
+                disabled
+                className="rounded-full bg-gray-100 cursor-not-allowed text-gray-700 font-medium"
+                placeholder="Your role will be displayed here"
               />
+              <p className="text-xs text-muted-foreground">This field shows your current role and cannot be edited</p>
             </div>
           </div>
 

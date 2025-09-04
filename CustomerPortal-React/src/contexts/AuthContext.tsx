@@ -1,6 +1,9 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import { apiClient, type User, type RegisterRequest } from '@/lib/api-client'
 
+// Utility function to get the correct dashboard URL for each role
+// This is now handled in App.tsx with the updated version
+
 interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
@@ -23,6 +26,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Session monitoring function
   const checkSession = async () => {
+    setSessionStatus('checking')
+    
+    // Always try to get current user from the new API endpoint first
+    // This ensures we check the backend session on every page refresh
+    try {
+      console.log('Checking backend session via new API endpoint...')
+      const response = await apiClient.getCurrentUser()
+      if (response.success && response.data) {
+        setUser(response.data)
+        setSessionStatus('active')
+        console.log('Authenticated via backend session:', response.data)
+        return
+      }
+    } catch (error) {
+      console.log('Backend session check failed:', error)
+    }
+    
+    // Fallback to legacy token-based authentication
     const token = apiClient.getToken()
     const demoToken = localStorage.getItem('demo_token')
     
@@ -32,9 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     
-    setSessionStatus('checking')
-    
-    if (token) {
+    if (token && !token.startsWith('temp_')) {
       try {
         const response = await apiClient.getCurrentUser()
         if (response.success && response.data) {
@@ -47,12 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSessionStatus('expired')
         }
       } catch (error) {
-        console.error('Session check failed:', error)
+        console.error('Token-based session check failed:', error)
         apiClient.logout()
         setUser(null)
         setSessionStatus('expired')
       }
-    } else if (demoToken) {
+    } else if (demoToken || (token && token.startsWith('temp_'))) {
       // Demo authentication - create a demo user
       const demoUser: User = {
         id: '1',
@@ -78,12 +97,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check if user is already authenticated on app load
   useEffect(() => {
+    // Immediately check session on app load
     checkSession().finally(() => {
       setIsLoading(false)
     })
+    
+    // Also check session after a short delay to handle any race conditions
+    const immediateCheck = setTimeout(() => {
+      if (!user) {
+        console.log('Performing immediate session re-check...')
+        checkSession()
+      }
+    }, 1000)
+    
+    return () => clearTimeout(immediateCheck)
   }, [])
 
-  // Set up periodic session checking
+  // Set up periodic session checking and focus-based checking
   useEffect(() => {
     // Clear any existing interval
     if (sessionCheckInterval) {
@@ -100,11 +130,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSessionCheckInterval(interval)
     }
 
+    // Check session when window gains focus (user returns to tab)
+    const handleFocus = () => {
+      if (user) {
+        console.log('Window focused, checking session...')
+        checkSession()
+      }
+    }
+
+    // Check session when user navigates (route changes)
+    const handleRouteChange = () => {
+      if (user) {
+        console.log('Route changed, checking session...')
+        checkSession()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('popstate', handleRouteChange)
+
     // Cleanup on unmount
     return () => {
       if (sessionCheckInterval) {
         clearInterval(sessionCheckInterval)
       }
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('popstate', handleRouteChange)
     }
   }, [user, sessionStatus])
 
@@ -118,13 +169,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('Login response:', response)
       
       if (response.success && response.data) {
-        // Get user data after successful login
+        // Get user data after successful login using the new API endpoint
+        console.log('Login successful, fetching user data...')
         const userResponse = await apiClient.getCurrentUser()
         console.log('User response:', userResponse)
         
         if (userResponse.success && userResponse.data) {
+          console.log('Setting user data:', userResponse.data)
+          console.log('User role:', userResponse.data.role)
           setUser(userResponse.data)
           setSessionStatus('active')
+          console.log('User authenticated successfully:', userResponse.data)
           
           // Handle remember me functionality
           if (rememberMe) {
@@ -136,6 +191,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           
           return true
+        } else {
+          console.log('Failed to get user data after login:', userResponse.message)
         }
       }
       
