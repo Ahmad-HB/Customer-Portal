@@ -53,9 +53,9 @@ public static class PortalDtoExtensions
                     {
                         property.Attributes.Add(new RequiredAttribute());
                         property.Attributes.Add(new DynamicStringLengthAttribute(typeof(IdentityUserConsts),
-                            nameof(IdentityUserConsts.MaxUserNameLength)));
-                        // You might want to add phone number validation attribute here
-                        // property.Attributes.Add(new PhoneAttribute());
+                            nameof(IdentityUserConsts.MaxPhoneNumberLength)));
+                        // Add phone number validation attribute
+                        property.Attributes.Add(new PhoneAttribute());
                     });
         });
     }

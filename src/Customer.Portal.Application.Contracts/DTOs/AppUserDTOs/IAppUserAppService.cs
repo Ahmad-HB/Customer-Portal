@@ -15,4 +15,10 @@ public interface IAppUserAppService : IApplicationService
     public Task<AppUserDto> GetCurrentAppUserAsync();
     
     public Task<string> GetCurrntUserRoleAsync();
+    
+    public Task<PagedResultDto<AppUserDto>> GetSupportAgentsAsync();
+
+    public Task<PagedResultDto<AppUserDto>> GetTechniciansAsync();
+    
+    public Task FixMissingIdentityUserIdsAsync();
 }

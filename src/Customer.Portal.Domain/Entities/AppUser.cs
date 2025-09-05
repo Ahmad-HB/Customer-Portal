@@ -12,6 +12,8 @@ public class AppUser : FullAuditedEntity<Guid>
     public UserType UserType { get; set; }
     
     public string Name { get; set; }
+
+    public string UserName { get; set; }
     
     public string Email { get; set; }
     
@@ -28,10 +30,11 @@ public class AppUser : FullAuditedEntity<Guid>
     public List<UserServicePlan> UserServicePlans { get; set; }
 
 
-    public AppUser(Guid id, string name, string email, string phoneNumber, bool isActive, UserType userType, Guid identityUserId) : base(id)
+    public AppUser(Guid id, string name, string userName, string email, string phoneNumber, bool isActive, UserType userType, Guid identityUserId) : base(id)
     {
         Id = id;
         Name = name;
+        UserName = userName;
         Email = email;
         PhoneNumber = phoneNumber;
         IsActive = isActive;

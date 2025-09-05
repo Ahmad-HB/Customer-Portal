@@ -50,13 +50,15 @@ public class SupportTicketAppService : PortalAppService, ISupportTicketAppServic
         return ObjectMapper.Map<SupportTicket, SupportTicketDto>(supportTicket);
     }
 
-    public async Task<List<PagedResultDto<SupportTicketDto>>> GetSupportTicketsAsync()
+    public async Task<PagedResultDto<SupportTicketDto>> GetSupportTicketsAsync()
     {
         Guid identityUserId = _currentUser.Id ?? throw new UserFriendlyException("User is not logged in.");
         
         var supportTickets = await _supportTicketManager.GetSupportTicketsAsync(identityUserId);
         
-        return ObjectMapper.Map<List<SupportTicket>, List<PagedResultDto<SupportTicketDto>>>(supportTickets);
+        var supportTicketDtos = ObjectMapper.Map<List<SupportTicket>, List<SupportTicketDto>>(supportTickets);
+        
+        return new PagedResultDto<SupportTicketDto>(supportTickets.Count, supportTicketDtos);
     }
 
     public async Task DeleteSupportTicketAsync(Guid supportTicketId)
@@ -94,20 +96,20 @@ public class SupportTicketAppService : PortalAppService, ISupportTicketAppServic
         await _supportTicketManager.UpdateTicketPriorityAsync(supportTicketId, priority);
     }
 
-    public async Task AddCommentToTicketAsync(Guid supportTicketId, string comment)
-    {
-        Guid identityUserId = _currentUser.Id ?? throw new UserFriendlyException("User is not logged in.");
-        
-        await _supportTicketManager.AddCommentToTicketAsync(supportTicketId, comment, identityUserId);
-        
-    }
+    // public async Task AddCommentToTicketAsync(Guid supportTicketId, string comment)
+    // {
+    //     Guid identityUserId = _currentUser.Id ?? throw new UserFriendlyException("User is not logged in.");
+    //     
+    //     await _supportTicketManager.AddCommentToTicketAsync(supportTicketId, comment, identityUserId);
+    //     
+    // }
     
-    public async Task RemoveCommentFromTicketAsync(Guid supportTicketId, Guid ticketCommentId)
-    {
-        Guid identityUserId = _currentUser.Id ?? throw new UserFriendlyException("User is not logged in.");
-        
-        await _supportTicketManager.RemoveCommentFromTicketAsync(supportTicketId, ticketCommentId);
-    }
+    // public async Task RemoveCommentFromTicketAsync(Guid supportTicketId, Guid ticketCommentId)
+    // {
+    //     Guid identityUserId = _currentUser.Id ?? throw new UserFriendlyException("User is not logged in.");
+    //     
+    //     await _supportTicketManager.RemoveCommentFromTicketAsync(supportTicketId, ticketCommentId);
+    // }
 
     #endregion
 }

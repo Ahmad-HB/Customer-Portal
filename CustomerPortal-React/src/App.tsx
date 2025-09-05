@@ -10,7 +10,6 @@ import { useEffect } from "react"
 // Import pages
 import LoginPage from "@/login/page"
 import SignupPage from "@/signup/page"
-import CustomerDashboardPage from "@/customer/dashboard/page"
 import TicketsPage from "@/tickets/page"
 import PlansPage from "@/plans/page"
 import ProfilePage from "@/profile/page"
@@ -48,31 +47,45 @@ const TechnicianOnly = ({ children }: { children: React.ReactNode }) => (
 
 // Helper function to get the appropriate URL for each role
 function getDashboardUrlForRole(role: string | null): string {
-  switch (role) {
+  if (!role) {
+    console.warn('🔒 [getDashboardUrlForRole] No role provided, defaulting to profile')
+    return '/profile'
+  }
+
+  // Normalize role to lowercase for comparison
+  const normalizedRole = role.toLowerCase()
+  
+  console.log(`🔒 [getDashboardUrlForRole] Processing role: "${role}" (normalized: "${normalizedRole}")`)
+  
+  switch (normalizedRole) {
     case 'admin':
+      console.log('🔒 [getDashboardUrlForRole] Admin user -> /admin/dashboard')
       return '/admin/dashboard'
-    case 'supportAgent':
-      return '/support/profile'             // Support Agent (go to profile)
+    case 'supportagent':
+    case 'support_agent':
+      console.log('🔒 [getDashboardUrlForRole] Support Agent -> /support/profile')
+      return '/support/profile'
     case 'technician':
-      return '/technician/assigned-tickets' // Technician (go to assigned tickets)
+      console.log('🔒 [getDashboardUrlForRole] Technician -> /technician/assigned-tickets')
+      return '/technician/assigned-tickets'
     case 'customer':
-      return '/customer/dashboard'
+      console.log('🔒 [getDashboardUrlForRole] Customer -> /profile')
+      return '/profile'
     default:
-      return '/profile'                     // Default to profile, not customer dashboard
+      console.warn(`🔒 [getDashboardUrlForRole] Unknown role "${role}", defaulting to profile`)
+      return '/profile'
   }
 }
 
 // Protected Route Component with role-based access control
 function ProtectedRoute({ 
   children, 
-  allowedRoles, 
   redirectToRoleDashboard = false 
 }: { 
   children: React.ReactNode
-  allowedRoles?: string[]
   redirectToRoleDashboard?: boolean
 }) {
-  const { isAuthenticated, isLoading, user, checkSession } = useAuth()
+  const { isAuthenticated, isLoading, checkSession } = useAuth()
   const { role: currentRole, isLoading: roleLoading } = useCurrentUserRole()
   
   // Monitor session status
@@ -85,18 +98,34 @@ function ProtectedRoute({
     }
   }, [checkSession])
 
-  if (isLoading || roleLoading) {
+  // Show loading only if we're still checking authentication OR if we need role info but don't have it yet
+  if (isLoading || (redirectToRoleDashboard && roleLoading)) {
     return <LoadingOverlay text="Checking authentication..." />
   }
 
+  // If not authenticated, redirect to login
   if (!isAuthenticated) {
+    console.log('🔒 [ProtectedRoute] User not authenticated, redirecting to login')
     return <Navigate to="/login" replace />
   }
 
-  // If user is authenticated but we need to redirect to their role dashboard
-  if (redirectToRoleDashboard && currentRole) {
-    const userDashboard = getDashboardUrlForRole(currentRole)
-    return <Navigate to={userDashboard} replace />
+  // If user is authenticated and we need to redirect to their role dashboard
+  if (redirectToRoleDashboard) {
+    // If we have a role, redirect immediately
+    if (currentRole) {
+      const userDashboard = getDashboardUrlForRole(currentRole)
+      console.log(`🔒 [ProtectedRoute] Redirecting ${currentRole} user to: ${userDashboard}`)
+      return <Navigate to={userDashboard} replace />
+    }
+    
+    // If we don't have a role yet but user is authenticated, show loading
+    if (roleLoading) {
+      return <LoadingOverlay text="Loading your dashboard..." />
+    }
+    
+    // If we have no role and not loading, something went wrong - redirect to profile
+    console.warn('🔒 [ProtectedRoute] User authenticated but no role found, redirecting to profile')
+    return <Navigate to="/profile" replace />
   }
 
   // NOTE: Role checking is now handled by RoleBasedAccess components
@@ -104,6 +133,34 @@ function ProtectedRoute({
   // Remove the old role checking logic to prevent conflicts
   
   return <>{children}</>
+}
+
+// Root redirect component that shows user info while redirecting
+function RootRedirectComponent() {
+  const { user } = useAuth()
+  const { role: currentRole } = useCurrentUserRole()
+  
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
+      <div className="text-center max-w-md mx-auto p-8">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-6"></div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back!</h1>
+        <p className="text-muted-foreground mb-4">Redirecting you to your dashboard...</p>
+        <div className="bg-white rounded-lg p-4 shadow-sm border">
+          <p className="text-sm text-gray-600">
+            You are logged in as: <span className="font-semibold text-primary">
+              {user?.name || user?.username || 'Loading...'}
+            </span>
+          </p>
+          {currentRole && (
+            <p className="text-xs text-gray-500 mt-1">
+              Role: <span className="font-medium capitalize">{currentRole}</span>
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // Unified layout that works for all roles
@@ -128,29 +185,10 @@ function App() {
           {/* Root route - redirect to user's appropriate dashboard */}
           <Route path="/" element={
             <ProtectedRoute redirectToRoleDashboard={true}>
-              <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
-                <div className="text-center max-w-md mx-auto p-8">
-                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-6"></div>
-                  <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back!</h1>
-                  <p className="text-muted-foreground mb-4">Redirecting you to your dashboard...</p>
-                  <div className="bg-white rounded-lg p-4 shadow-sm border">
-                    <p className="text-sm text-gray-600">
-                      You are logged in as: <span className="font-semibold text-primary">Loading...</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <RootRedirectComponent />
             </ProtectedRoute>
           } />
 
-          {/* Protected Customer routes - ONLY accessible by customers */}
-          <Route path="/customer/dashboard" element={
-            <CustomerOnly>
-              <AppLayout>
-                <CustomerDashboardPage />
-              </AppLayout>
-            </CustomerOnly>
-          } />
           <Route path="/tickets" element={
             <CustomerOnly>
               <AppLayout>

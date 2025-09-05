@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Customer.Portal.Entities;
 using Customer.Portal.Enums;
@@ -48,7 +49,8 @@ public class AppUserManager : DomainService, IAppUserManager
 
         var appUser = new AppUser(
             _guidGenerator.Create(),
-            identityUser.UserName, 
+            identityUser.Name, 
+            identityUser.UserName,
             identityUser.Email,
             identityUser.PhoneNumber ?? "+0000000000",
             true, 
@@ -116,7 +118,70 @@ public class AppUserManager : DomainService, IAppUserManager
     
     public async Task GetCurrentUserRoleAsync(Guid identityUserId)
     {
-        return;
+        await Task.CompletedTask;
+    }
+    
+    public async Task<List<AppUser>> GetSupportAgentsAsync()
+    {
+        var query = await _appUserRepository.GetQueryableAsync();
+        var supportAgents = await AsyncExecuter.ToListAsync(
+            query.Where(x => x.UserType == UserType.SupportAgent && x.IsActive)
+        );
+        
+        return supportAgents;
+    }
+    
+    public async Task<List<AppUser>> GetTechniciansAsync()
+    {
+        var query = await _appUserRepository.GetQueryableAsync();
+        var technicians = await AsyncExecuter.ToListAsync(
+            query.Where(x => x.UserType == UserType.Technician && x.IsActive)
+        );
+        
+        return technicians;
+    }
+    
+    public async Task FixMissingIdentityUserIdsAsync()
+    {
+        // Get all AppUsers with empty IdentityUserId
+        var appUsersWithEmptyIdentityUserId = await _appUserRepository.GetListAsync(u => u.IdentityUserId == Guid.Empty);
+        
+        foreach (var appUser in appUsersWithEmptyIdentityUserId)
+        {
+            // Try to find the corresponding IdentityUser by email
+            var identityUser = await _userManager.FindByEmailAsync(appUser.Email);
+            if (identityUser != null)
+            {
+                // Update the AppUser with the correct IdentityUserId
+                appUser.IdentityUserId = identityUser.Id;
+                await _appUserRepository.UpdateAsync(appUser);
+            }
+        }
+    }
+    
+    public async Task SyncAppUserWithIdentityUserAsync(IdentityUser identityUser)
+    {
+        // Find the corresponding AppUser
+        var appUser = await _appUserRepository.FirstOrDefaultAsync(u => u.IdentityUserId == identityUser.Id);
+        if (appUser == null)
+        {
+            throw new Exception($"AppUser not found for the given {identityUser.Id}.");
+        }
+        
+        // Update AppUser properties to match IdentityUser
+        appUser.Name = identityUser.Name;
+        appUser.UserName = identityUser.UserName;
+        appUser.Email = identityUser.Email;
+        appUser.PhoneNumber = identityUser.PhoneNumber;
+        
+        // Determine if user is active based on IdentityUser propertie
+        appUser.IsActive = identityUser.IsActive;
+        
+        // Update UserType based on roles
+        var userType = await DetermineUserTypeAsync(identityUser);
+        appUser.UserType = userType;
+        
+        await _appUserRepository.UpdateAsync(appUser);
     }
 
     #endregion

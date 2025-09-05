@@ -19,11 +19,6 @@ public class TicketCommentConfiguration : IEntityTypeConfiguration<TicketComment
             .IsRequired()
             .HasColumnType("date");
 
-        builder.HasOne(x => x.Ticket)
-            .WithMany(x => x.TicketComments)
-            .HasForeignKey(x => x.TicketId)
-            .OnDelete(DeleteBehavior.Cascade);
-
         builder.HasOne(x => x.User)
             .WithMany()
             .HasForeignKey(x => x.UserId)

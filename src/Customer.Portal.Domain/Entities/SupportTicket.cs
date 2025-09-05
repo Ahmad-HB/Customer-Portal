@@ -22,8 +22,6 @@ public class SupportTicket : FullAuditedAggregateRoot<Guid>
     public Guid ServicePlanId { get; set; }
     
     public ServicePlan ServicePlan { get; set; }
-
-    public List<TicketComment> TicketComments { get; set; }
     
     public string Subject { get; set; }
     
@@ -46,8 +44,6 @@ public class SupportTicket : FullAuditedAggregateRoot<Guid>
         Description = description;
         Status = TicketStatus.Open;
         CreatedAt = DateTime.Now.Date;
-
-        TicketComments = new List<TicketComment>();
     }
 
 

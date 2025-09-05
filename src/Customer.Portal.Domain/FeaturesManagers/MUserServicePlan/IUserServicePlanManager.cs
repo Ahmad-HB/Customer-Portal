@@ -12,7 +12,7 @@ public interface IUserServicePlanManager : IDomainService
     
     public Task<UserServicePlan> GetUserServicePlanAsync(Guid identityUserId, Guid id);
     
-    public Task SuspendUserServicePlanAsync(Guid identityUserId, Guid id);
+    public Task SuspendUserServicePlanAsync(Guid identityUserId, Guid id, string? suspensionReason = null);
     
     public Task ReactivateUserServicePlanAsync(Guid identityUserId, Guid id);
     

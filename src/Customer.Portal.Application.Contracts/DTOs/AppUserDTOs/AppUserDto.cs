@@ -8,13 +8,19 @@ namespace Customer.Portal.DTOs.AppUserDTOs;
 
 public class AppUserDto : FullAuditedEntityDto<Guid>
 {
+    public Guid IdentityUserId { get; set; }
+    
     public string Name { get; set; }
+    
+    public string Username { get; set; }
     
     public string Email { get; set; }
     
     public string PhoneNumber { get; set; }
     
     public UserType UserType { get; set; }
+    
+    public string Role { get; set; }
     
     public bool IsActive { get; set; }
 

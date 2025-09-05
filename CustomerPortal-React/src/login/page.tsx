@@ -44,7 +44,7 @@ export default function LoginPage() {
       } else if (isSupportAgent) {
         navigate('/support/profile')
       } else if (isCustomer) {
-        navigate('/customer/dashboard')
+        navigate('/profile')
       } else {
         // Fallback to profile page
         navigate('/profile')
@@ -69,7 +69,7 @@ export default function LoginPage() {
         } else if (isAdmin) {
           navigate("/admin/dashboard")
         } else if (isCustomer) {
-          navigate("/customer/dashboard")
+          navigate("/profile")
         } else {
           // Fallback to profile page
           navigate("/profile")
@@ -193,11 +193,11 @@ export default function LoginPage() {
               {"Don't have an account?"}
             </Link>
             <div className="text-xs text-muted-foreground">
-              <p><strong>Demo Credentials:</strong></p>
-              <p>Username/Email: customer@example.com | Password: password123</p>
-              <p>Username/Email: technician@example.com | Password: password123</p>
-              <p>Username/Email: support@example.com | Password: password123</p>
-              <p>Username/Email: admin@example.com | Password: password123</p>
+              <p><strong>Test Credentials:</strong></p>
+              <p><strong>Admin:</strong> admin | Password: 1q2w3E*</p>
+              <p><strong>Support Agent:</strong> sarah.johnson | Password: Support123!</p>
+              <p><strong>Technician:</strong> alex.martinez | Password: Tech123!</p>
+              <p><strong>Customer:</strong> robert.brown | Password: Customer123!</p>
             </div>
           </div>
         </CardContent>

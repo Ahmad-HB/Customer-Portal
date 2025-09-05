@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to {{ CompanyName }}!</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #007bff;
+            margin: 0;
+            font-size: 28px;
+        }
+        .welcome-badge {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .welcome-section {
+            background-color: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        .account-info {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .info-value {
+            color: #212529;
+        }
+        .features-section {
+            background-color: #e8f5e8;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #28a745;
+        }
+        .next-steps {
+            background-color: #fff4e6;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #ff6b35;
+        }
+        .contact-info {
+            background-color: #f0f8ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+        .feature-icon {
+            margin-right: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Welcome to {{ CompanyName }}!</h1>
+            <div class="welcome-badge">Account Created Successfully</div>
+        </div>
+
+        <p>Hello <strong>{{ UserName }}</strong>,</p>
+        
+        <p>Welcome to {{ CompanyName }}! We're excited to have you as part of our community. Your account has been successfully created and you're ready to get started.</p>
+
+        <div class="welcome-section">
+            <h3>🌟 Thank You for Joining Us!</h3>
+            <p>We're thrilled to have you on board. Our team is committed to providing you with the best possible experience and support.</p>
+        </div>
+
+        <div class="account-info">
+            <h3>👤 Your Account Information</h3>
+            <div class="info-row">
+                <span class="info-label">Username/Email:</span>
+                <span class="info-value"><strong>{{ UserEmail }}</strong></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Account Type:</span>
+                <span class="info-value">{{ UserType }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Registration Date:</span>
+                <span class="info-value">{{ RegistrationDate }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Account Status:</span>
+                <span class="info-value" style="color: #28a745; font-weight: bold;">Active</span>
+            </div>
+        </div>
+
+        <div class="features-section">
+            <h3>🚀 What You Can Do Now</h3>
+            <ul class="feature-list">
+                <li><span class="feature-icon">🎫</span> Create and manage support tickets</li>
+                <li><span class="feature-icon">📊</span> Track your service plans and subscriptions</li>
+                <li><span class="feature-icon">💬</span> Communicate with our support team</li>
+                <li><span class="feature-icon">📱</span> Access your account from any device</li>
+                <li><span class="feature-icon">🔔</span> Receive real-time notifications</li>
+                <li><span class="feature-icon">📈</span> View your account history and reports</li>
+            </ul>
+        </div>
+
+        <div class="next-steps">
+            <h3>📝 Getting Started</h3>
+            <ol>
+                <li><strong>Complete Your Profile:</strong> Add your contact information and preferences</li>
+                <li><strong>Explore the Dashboard:</strong> Familiarize yourself with the interface</li>
+                <li><strong>Create Your First Ticket:</strong> If you need assistance, don't hesitate to reach out</li>
+                <li><strong>Set Up Notifications:</strong> Choose how you'd like to receive updates</li>
+            </ol>
+        </div>
+
+        <div class="contact-info">
+            <h3>📞 Need Help Getting Started?</h3>
+            <p>Our support team is here to help you every step of the way:</p>
+            <p>
+                <strong>Support Email:</strong> {{ SupportEmail }}<br>
+                <strong>Support Phone:</strong> {{ SupportPhone }}<br>
+                <strong>Live Chat:</strong> Available 24/7 on our website
+            </p>
+            <p><em>We typically respond within 2 hours during business hours.</em></p>
+        </div>
+
+        <div style="text-align: center;">
+            <a href="{{ LoginUrl }}" class="btn">Access Your Account</a>
+        </div>
+
+        <div class="footer">
+            <p>This email was sent by {{ CompanyName }} Welcome System</p>
+            <p>Thank you for choosing us. We look forward to serving you!</p>
+        </div>
+    </div>
+</body>
+</html>

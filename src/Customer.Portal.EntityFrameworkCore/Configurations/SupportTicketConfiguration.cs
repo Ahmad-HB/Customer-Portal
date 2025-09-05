@@ -35,11 +35,6 @@ public class SupportTicketConfiguration : IEntityTypeConfiguration<SupportTicket
             .WithMany(x => x.SupportTickets)
             .HasForeignKey(x => x.AppUserId)
             .OnDelete(DeleteBehavior.NoAction);
-
-        builder.HasMany(x => x.TicketComments)
-            .WithOne(x => x.Ticket)
-            .HasForeignKey(x => x.TicketId)
-            .OnDelete(DeleteBehavior.SetNull);
         
         builder.HasOne(x => x.Supportagent)
             .WithMany()

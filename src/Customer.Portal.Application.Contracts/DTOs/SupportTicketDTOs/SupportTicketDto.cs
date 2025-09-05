@@ -10,17 +10,18 @@ public class SupportTicketDto : FullAuditedEntityDto<Guid>
 {
     public Guid AppUserId { get; set; }
     public string AppUserName { get; set; }
+    public string AppUserEmail { get; set; }
     
     public Guid? SupportagentId { get; set; }
     public string SupportagentName { get; set; }
+    public string SupportagentEmail { get; set; }
 
     public Guid? TechnicianId { get; set; }
-    public string IdentityUserName { get; set; }
+    public string TechnicianName { get; set; }
+    public string TechnicianEmail { get; set; }
     
     public Guid ServicePlanId { get; set; }
     public string ServicePlanName { get; set; }
-
-    public List<TicketComment> TicketComments { get; set; }
     
     public string Subject { get; set; }
     

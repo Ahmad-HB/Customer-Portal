@@ -51,13 +51,16 @@ public class UserServicePlanHandler : ILocalEventHandler<EntityUpdatedEventData<
         {
             var userServicePlan = eventData.Entity;
             
+            _logger.LogInformation("UserServicePlan updated event received for plan {ServicePlanId} - IsActive: {IsActive}, IsSuspended: {IsSuspended}, SuspensionReason: {SuspensionReason}", 
+                userServicePlan.ServicePlanId, userServicePlan.IsActive, userServicePlan.IsSuspended, userServicePlan.SuspensionReason);
+            
             // Get the app user and their identity user
             var appUser = await _appUserRepository.GetAsync(userServicePlan.AppUserId);
             var identityUser = await _identityUserRepository.GetAsync(appUser.IdentityUserId);
             var servicePlan = await _servicePlanRepository.GetAsync(userServicePlan.ServicePlanId);
             
-            _logger.LogInformation("Sending service plan change confirmation email for plan {ServicePlanId} to user {UserId}", 
-                userServicePlan.ServicePlanId, identityUser.Id);
+            _logger.LogInformation("Sending service plan change confirmation email for plan {ServicePlanId} to user {UserId} ({UserEmail})", 
+                userServicePlan.ServicePlanId, identityUser.Id, identityUser.Email);
             
             // Determine the action type and details
             string actionType;
@@ -67,6 +70,13 @@ public class UserServicePlanHandler : ILocalEventHandler<EntityUpdatedEventData<
             {
                 actionType = "Service Plan Suspension";
                 actionDetails = $"Suspending service plan '{servicePlan.Name}' for user {identityUser.UserName}. Reason: {userServicePlan.SuspensionReason ?? "No reason provided"}";
+            }
+            else if (userServicePlan.IsActive && !userServicePlan.IsSuspended)
+            {
+                // This could be a reactivation or a general change
+                // We'll use a more generic approach since we can't easily detect the previous state
+                actionType = "Service Plan Activation";
+                actionDetails = $"Service plan '{servicePlan.Name}' is now active for user {identityUser.UserName}. The service plan is available and ready to use.";
             }
             else if (!userServicePlan.IsActive)
             {
@@ -80,6 +90,7 @@ public class UserServicePlanHandler : ILocalEventHandler<EntityUpdatedEventData<
             }
             
             // Send confirmation email
+            _logger.LogInformation("Attempting to send confirmation email for {ActionType} to {UserEmail}", actionType, identityUser.Email);
             await _emailManager.SendConfirmationEmailAsync(identityUser.Email, identityUser.Id, actionType, actionDetails);
             
             _logger.LogInformation("Service plan confirmation email process completed for plan {ServicePlanId}", userServicePlan.ServicePlanId);

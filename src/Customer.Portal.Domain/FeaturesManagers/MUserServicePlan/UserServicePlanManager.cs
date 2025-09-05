@@ -79,7 +79,7 @@ public class UserServicePlanManager : DomainService, IUserServicePlanManager
         return userServicePlan;
     }
 
-    public async Task SuspendUserServicePlanAsync(Guid identityUserId, Guid id)
+    public async Task SuspendUserServicePlanAsync(Guid identityUserId, Guid id, string? suspensionReason = null)
     {
         var userServicePlan = await GetUserServicePlanAsync(identityUserId, id);
         
@@ -89,6 +89,8 @@ public class UserServicePlanManager : DomainService, IUserServicePlanManager
         }
         
         userServicePlan.IsActive = false;
+        userServicePlan.IsSuspended = true;
+        userServicePlan.SuspensionReason = suspensionReason;
         
         await _userServicePlanRepository.UpdateAsync(userServicePlan);
         
@@ -104,6 +106,8 @@ public class UserServicePlanManager : DomainService, IUserServicePlanManager
         }
         
         userServicePlan.IsActive = true;
+        userServicePlan.IsSuspended = false;
+        userServicePlan.SuspensionReason = null;
         userServicePlan.EndDate = userServicePlan.EndDate > DateTime.UtcNow ? userServicePlan.EndDate : DateTime.UtcNow.AddMonths(1);
         
         await _userServicePlanRepository.UpdateAsync(userServicePlan);
@@ -113,15 +117,7 @@ public class UserServicePlanManager : DomainService, IUserServicePlanManager
     {
         var userServicePlan = await GetUserServicePlanAsync(identityUserId, id);
         
-        if (userServicePlan.IsActive == false)
-        {
-            throw new Exception("Only active service plans can be cancelled.");
-        }
-        
-        userServicePlan.IsActive = false;
-        userServicePlan.EndDate = DateTime.UtcNow;
-        
-        await _userServicePlanRepository.UpdateAsync(userServicePlan);
+        await _userServicePlanRepository.DeleteAsync(userServicePlan);
     }
 
     #endregion

@@ -48,11 +48,11 @@ public class UserServicePlanAppService : PortalAppService, IUserServicePlanAppSe
         return ObjectMapper.Map<Entities.UserServicePlan, UserServicePlanDto>(userServicePlan);
     }
 
-    public async Task SuspendUserServicePlanAsync(Guid id)
+    public async Task SuspendUserServicePlanAsync(SuspendUserServicePlanDto input)
     {
         Guid identityUserId = _currentUser.Id ?? throw new Exception("User is not logged in.");
         
-        await _userServicePlanManager.SuspendUserServicePlanAsync(identityUserId, id);
+        await _userServicePlanManager.SuspendUserServicePlanAsync(identityUserId, input.Id, input.SuspensionReason);
     }
 
     public async Task ReactivateUserServicePlanAsync(Guid id)

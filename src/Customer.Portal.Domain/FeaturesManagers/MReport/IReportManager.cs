@@ -13,9 +13,9 @@ public interface IReportManager : IDomainService
     
     public Task<Byte[]> GenerateSupportAgentWithTechnicianReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId);
     
-    public Task<Byte[]> GenerateTechnicianReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId);
+    public Task<Byte[]> GenerateTechnicianReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId, string workPerformed);
     
-    public Task<Byte[]> GenerateMonthlySummaryReportAsync(ReportTypes reportType, DateTime startDate, DateTime endDate);
+    public Task<Byte[]> GenerateSummaryReportAsync(ReportTypes reportType, DateTime startDate, DateTime endDate);
     
     
     

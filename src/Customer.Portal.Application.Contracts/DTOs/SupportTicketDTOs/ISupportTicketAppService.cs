@@ -13,7 +13,7 @@ public interface ISupportTicketAppService : IApplicationService
     
     public Task<SupportTicketDto> GetSupportTicketByIdAsync(Guid supportTicketId);
     
-    public Task<List<PagedResultDto<SupportTicketDto>>> GetSupportTicketsAsync();
+    public Task<PagedResultDto<SupportTicketDto>> GetSupportTicketsAsync();
     
     public Task DeleteSupportTicketAsync(Guid supportTicketId);
     
@@ -25,7 +25,7 @@ public interface ISupportTicketAppService : IApplicationService
     
     public Task UpdateTicketPriorityAsync(Guid supportTicketId, TicketPriority priority);
     
-    public Task AddCommentToTicketAsync(Guid supportTicketId, string comment);
-    
-    public Task RemoveCommentFromTicketAsync(Guid supportTicketId, Guid ticketCommentId);
+    // public Task AddCommentToTicketAsync(Guid supportTicketId, string comment);
+    //
+    // public Task RemoveCommentFromTicketAsync(Guid supportTicketId, Guid ticketCommentId);
 }

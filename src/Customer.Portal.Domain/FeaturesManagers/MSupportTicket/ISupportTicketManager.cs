@@ -12,12 +12,12 @@ public interface ISupportTicketManager : IDomainService
     public Task CreateSupportTicketAsync(SupportTicket supportTicket, Guid identityUserId);
     
     public Task<SupportTicket> GetSupportTicketByIdAsync(Guid supportTicketId);
-    
+
     public Task<List<SupportTicket>> GetSupportTicketsAsync(Guid identityUserId);
     
     public Task DeleteSupportTicketAsync(Guid supportTicketId);
     
-    public Task AssignSupportAgentAsync(Guid supportTicketId);
+    public Task<bool> AssignSupportAgentAsync(Guid supportTicketId);
     
     public Task AssignTechnicianAsync(Guid supportTicketId, Guid technicianId);
     
@@ -25,10 +25,10 @@ public interface ISupportTicketManager : IDomainService
     
     public Task UpdateTicketPriorityAsync(Guid supportTicketId, TicketPriority priority);
     
-    public Task AddCommentToTicketAsync(Guid supportTicketId, string comment, Guid userId);
+    // public Task AddCommentToTicketAsync(Guid supportTicketId, string comment, Guid userId);
     
     public Task NotifyUserOnTicketUpdateAsync(Guid supportTicketId, UpdateType updateType);
     
-    public Task RemoveCommentFromTicketAsync(Guid supportTicketId, Guid ticketCommentId);
+    // public Task RemoveCommentFromTicketAsync(Guid supportTicketId, Guid ticketCommentId);
     
 }

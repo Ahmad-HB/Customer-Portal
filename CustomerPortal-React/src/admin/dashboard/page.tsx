@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { Plus, FileText, TrendingUp, Users, Clock, CheckCircle, Calendar as CalendarIcon } from "lucide-react"
+import { Plus, FileText, TrendingUp, Users, Clock, CheckCircle, Calendar as CalendarIcon, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
+import { apiClient } from "@/lib/api-client"
+import { ColorScheme } from "@/lib/color-scheme"
 import {
   PieChart,
   Pie,
@@ -20,55 +22,66 @@ import {
   YAxis,
   Scatter,
   ResponsiveContainer,
+  Tooltip,
 } from "recharts"
 
-// Enhanced mock data with more vibrant colors and better descriptions
-const totals = {
-  totalTickets: 1247,
-  resolvedTickets: 892,
-  withTechnician: 156,
-  inProgress: 199,
+// Interface for ticket data
+interface Ticket {
+  id: string
+  subject: string
+  description: string
+  status: number
+  priority: number
+  createdAt: string
+  resolvedAt?: string
+  technicianId?: string
+  supportagentId?: string
 }
 
-const statusDistribution = [
-  {
-    name: "Open",
-    value: 45,
-    fill: "#6366F1", // Indigo
-    description: "New tickets awaiting assignment",
-    icon: "🆕"
-  },
-  {
-    name: "In Progress",
-    value: 25,
-    fill: "#F59E0B", // Amber
-    description: "Tickets currently being worked on",
-    icon: "⚡"
-  },
-  {
-    name: "Resolved",
-    value: 20,
-    fill: "#10B981", // Emerald
-    description: "Successfully completed tickets",
-    icon: "✅"
-  },
-  {
-    name: "Waiting",
-    value: 10,
-    fill: "#EF4444", // Red
-    description: "Tickets waiting for customer response",
-    icon: "⏳"
-  },
-]
+// Custom tooltip component for pie chart
+const CustomPieTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload
+    return (
+      <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <div 
+            className="w-3 h-3 rounded-full" 
+            style={{ backgroundColor: data.fill }}
+          />
+          <span className="font-semibold text-gray-800">{data.name}</span>
+        </div>
+        <p className="text-sm text-gray-600 mb-1">
+          <span className="font-medium">{data.value}%</span> of total tickets
+        </p>
+        <p className="text-xs text-gray-500">{data.description}</p>
+      </div>
+    )
+  }
+  return null
+}
 
-const monthlyTrend = [
-  { month: "Jan", tickets: 95, color: "#6366F1" },
-  { month: "Feb", tickets: 120, color: "#8B5CF6" },
-  { month: "Mar", tickets: 70, color: "#EC4899" },
-  { month: "Apr", tickets: 145, color: "#F59E0B" },
-  { month: "May", tickets: 118, color: "#10B981" },
-  { month: "Jun", tickets: 135, color: "#EF4444" },
-]
+// Custom tooltip component for scatter chart
+const CustomScatterTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload
+    return (
+      <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <div 
+            className="w-3 h-3 rounded-full" 
+            style={{ backgroundColor: data.color }}
+          />
+          <span className="font-semibold text-gray-800">{data.month}</span>
+        </div>
+        <p className="text-sm text-gray-600">
+          <span className="font-medium">{data.tickets}</span> tickets created
+        </p>
+      </div>
+    )
+  }
+  return null
+}
 
 export default function AdminDashboardPage() {
   const [isCreateReportModalOpen, setIsCreateReportModalOpen] = useState(false)
@@ -76,26 +89,205 @@ export default function AdminDashboardPage() {
   const [endDate, setEndDate] = useState("")
   const [animateCards, setAnimateCards] = useState(false)
   const [animateCharts, setAnimateCharts] = useState(false)
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportError, setReportError] = useState("")
+  const [reportSuccess, setReportSuccess] = useState("")
 
-  const donutTotal = useMemo(() => statusDistribution.reduce((s, d) => s + d.value, 0), [])
+  // Calculate statistics from real ticket data
+  const totals = useMemo(() => {
+    const totalTickets = tickets.length
+    const resolvedTickets = tickets.filter(t => t.status === 3 || t.status === 4).length
+    const withTechnician = tickets.filter(t => t.technicianId).length
+    const inProgress = tickets.filter(t => t.status === 2).length
+    
+    return {
+      totalTickets,
+      resolvedTickets,
+      withTechnician,
+      inProgress
+    }
+  }, [tickets])
+
+  // Calculate status distribution from real data
+  const statusDistribution = useMemo(() => {
+    const total = tickets.length
+    if (total === 0) return []
+    
+    const open = tickets.filter(t => t.status === 1).length
+    const inProgress = tickets.filter(t => t.status === 2).length
+    const resolved = tickets.filter(t => t.status === 3).length
+    const closed = tickets.filter(t => t.status === 4).length
+    
+    return [
+      {
+        name: "Open",
+        value: Math.round((open / total) * 100),
+        fill: "#6366F1",
+        description: "New tickets awaiting assignment",
+        icon: "🆕"
+      },
+      {
+        name: "In Progress",
+        value: Math.round((inProgress / total) * 100),
+        fill: "#F59E0B",
+        description: "Tickets currently being worked on",
+        icon: "⚡"
+      },
+      {
+        name: "Resolved",
+        value: Math.round((resolved / total) * 100),
+        fill: "#10B981",
+        description: "Successfully completed tickets",
+        icon: "✅"
+      },
+      {
+        name: "Closed",
+        value: Math.round((closed / total) * 100),
+        fill: "#EF4444",
+        description: "Closed tickets",
+        icon: "🔒"
+      },
+    ].filter(item => item.value > 0)
+  }, [tickets])
+
+  // Calculate monthly trend from real ticket data
+  const monthlyTrend = useMemo(() => {
+    const now = new Date()
+    const months = []
+    const colors = ["#6366F1", "#8B5CF6", "#EC4899", "#F59E0B", "#10B981", "#EF4444"]
+    
+    // Get last 6 months
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const monthName = date.toLocaleDateString('en-US', { month: 'short' })
+      
+      // Count tickets created in this month
+      const ticketsInMonth = tickets.filter(ticket => {
+        const ticketDate = new Date(ticket.createdAt)
+        return ticketDate.getFullYear() === date.getFullYear() && 
+               ticketDate.getMonth() === date.getMonth()
+      }).length
+      
+      months.push({
+        month: monthName,
+        tickets: ticketsInMonth,
+        color: colors[i % colors.length]
+      })
+    }
+    
+    return months
+  }, [tickets])
+
+  const donutTotal = useMemo(() => tickets.length, [tickets])
+
+  // Fetch tickets data
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        setLoading(true)
+        setError("")
+        const response = await apiClient.getSupportTickets()
+        
+        if (response.success && response.data) {
+          setTickets(response.data.items || [])
+        } else {
+          setError("Failed to load ticket data")
+        }
+      } catch (err) {
+        console.error("Error fetching tickets:", err)
+        setError("Failed to load ticket data")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchTickets()
+  }, [])
 
   // Staggered animations
   useEffect(() => {
-    const timer1 = setTimeout(() => setAnimateCards(true), 100)
-    const timer2 = setTimeout(() => setAnimateCharts(true), 500)
+    if (!loading) {
+      const timer1 = setTimeout(() => setAnimateCards(true), 100)
+      const timer2 = setTimeout(() => setAnimateCharts(true), 500)
 
-    return () => {
-      clearTimeout(timer1)
-      clearTimeout(timer2)
+      return () => {
+        clearTimeout(timer1)
+        clearTimeout(timer2)
+      }
     }
-  }, [])
+  }, [loading])
 
-  const handleCreateReport = () => {
-    // Handle report creation logic here
-    console.log("Creating report from", startDate, "to", endDate)
-    setIsCreateReportModalOpen(false)
-    setStartDate("")
-    setEndDate("")
+  const handleCreateReport = async () => {
+    if (!startDate || !endDate) {
+      setReportError("Please select both start and end dates")
+      return
+    }
+
+    setReportLoading(true)
+    setReportError("")
+    setReportSuccess("")
+
+    try {
+      // Format dates for API (MM/dd/yyyy format)
+      const formattedStartDate = format(new Date(startDate), "MM/dd/yyyy")
+      const formattedEndDate = format(new Date(endDate), "MM/dd/yyyy")
+      
+      const response = await apiClient.generateSummaryReport(formattedStartDate, formattedEndDate)
+      
+      if (response.success) {
+        setReportSuccess("Report generated and downloaded successfully!")
+        // Close modal after a short delay
+        setTimeout(() => {
+          setIsCreateReportModalOpen(false)
+          setStartDate("")
+          setEndDate("")
+          setReportSuccess("")
+        }, 2000)
+      } else {
+        setReportError(response.message || "Failed to generate report")
+      }
+    } catch (err) {
+      console.error("Error generating report:", err)
+      setReportError("Failed to generate report. Please try again.")
+    } finally {
+      setReportLoading(false)
+    }
+  }
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="p-8 space-y-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="flex items-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <span className="text-lg text-gray-600">Loading dashboard data...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="p-8 space-y-8">
+        <div className="flex items-center justify-center h-64">
+          <div className={`p-6 ${ColorScheme.alerts.error.bg} border ${ColorScheme.alerts.error.border} rounded-lg max-w-md`}>
+            <p className={`${ColorScheme.alerts.error.text} text-center`}>{error}</p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="mt-4 w-full bg-blue-600 hover:bg-blue-700"
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -193,6 +385,7 @@ export default function AdminDashboardPage() {
               {/* Bigger Pie Chart */}
               <div className="flex-1 flex justify-center">
                 <PieChart width={400} height={400}>
+                  <Tooltip content={<CustomPieTooltip />} />
                   <Pie
                     data={statusDistribution}
                     cx="50%"
@@ -293,10 +486,11 @@ export default function AdminDashboardPage() {
                 />
                 <YAxis
                   type="number"
-                  domain={[0, 200]}
+                  domain={[0, Math.max(...monthlyTrend.map(m => m.tickets), 10)]}
                   tick={{ fontSize: 14, fill: "#6B7280" }} 
                   axisLine={{ stroke: "#E5E7EB" }} 
                 />
+                <Tooltip content={<CustomScatterTooltip />} />
 
                 {/* Big, visible dots with proper colors and animation */}
                 <Scatter 
@@ -324,7 +518,7 @@ export default function AdminDashboardPage() {
 
       {/* Create New Report Modal */}
       <Dialog open={isCreateReportModalOpen} onOpenChange={setIsCreateReportModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-blue-600" />
             <DialogTitle className="text-lg font-semibold">Create New Monthly Summary Report</DialogTitle>
@@ -334,6 +528,20 @@ export default function AdminDashboardPage() {
             <div className="text-center">
               <p className="text-sm text-gray-600">Generate a comprehensive monthly summary report for the selected period</p>
             </div>
+
+            {/* Error Message */}
+            {reportError && (
+              <div className={`p-4 ${ColorScheme.alerts.error.bg} border ${ColorScheme.alerts.error.border} rounded-lg`}>
+                <p className={`${ColorScheme.alerts.error.text} text-sm`}>{reportError}</p>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {reportSuccess && (
+              <div className={`p-4 ${ColorScheme.alerts.success.bg} border ${ColorScheme.alerts.success.border} rounded-lg`}>
+                <p className={`${ColorScheme.alerts.success.text} text-sm`}>{reportSuccess}</p>
+              </div>
+            )}
             
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -344,10 +552,12 @@ export default function AdminDashboardPage() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full h-12 justify-start text-left font-normal text-base px-4"
+                        className="w-full h-12 justify-start text-left font-normal text-base px-4 min-w-0"
                       >
-                        <CalendarIcon className="mr-3 h-5 w-5" />
-                        {startDate ? format(new Date(startDate), "PPP") : "Pick a date"}
+                        <CalendarIcon className="mr-3 h-5 w-5 flex-shrink-0" />
+                        <span className="truncate">
+                          {startDate ? format(new Date(startDate), "PPP") : "Pick a date"}
+                        </span>
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start" side="bottom" sideOffset={8}>
@@ -387,10 +597,12 @@ export default function AdminDashboardPage() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full h-12 justify-start text-left font-normal text-base px-4"
+                        className="w-full h-12 justify-start text-left font-normal text-base px-4 min-w-0"
                       >
-                        <CalendarIcon className="mr-3 h-5 w-5" />
-                        {endDate ? format(new Date(endDate), "PPP") : "Pick a date"}
+                        <CalendarIcon className="mr-3 h-5 w-5 flex-shrink-0" />
+                        <span className="truncate">
+                          {endDate ? format(new Date(endDate), "PPP") : "Pick a date"}
+                        </span>
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start" side="bottom" sideOffset={8}>
@@ -426,11 +638,20 @@ export default function AdminDashboardPage() {
             <div className="flex justify-end pt-4 border-t border-gray-100">
               <Button
                 onClick={handleCreateReport}
-                disabled={!startDate || !endDate}
+                disabled={!startDate || !endDate || reportLoading}
                 className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <FileText className="mr-2 h-4 w-4" />
-                Generate Report
+                {reportLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generating...
+                  </div>
+                ) : (
+                  <>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Generate Report
+                  </>
+                )}
               </Button>
             </div>
           </div>

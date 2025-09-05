@@ -1,13 +1,15 @@
 "use client"
 
-import { useState } from "react"
-import { Clock, User, Calendar, Package, Eye, ChevronDown, X, Plus, Send } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Clock, User, Calendar, Package, Eye, ChevronDown, Send, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RoleBasedAccess } from "@/components/RoleBasedAccess"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { apiClient } from "@/lib/api-client"
 
 // Ticket Priority enum matching backend
 const TicketPriority = {
@@ -19,74 +21,54 @@ const TicketPriority = {
 
 type TicketPriorityType = typeof TicketPriority[keyof typeof TicketPriority]
 
-// Ticket interface
+// Ticket interface matching API response
 interface Ticket {
   id: string
+  appUserId: string
+  appUserName: string
+  appUserEmail?: string
+  supportagentId?: string
+  supportagentName?: string
+  supportagentEmail?: string
+  technicianId?: string | null
+  technicianName?: string
+  technicianEmail?: string
+  identityUserName?: string | null
+  servicePlanId: string
+  servicePlanName?: string | null
   subject: string
   description: string
-  status: 'Open' | 'InProgress' | 'Resolved' | 'Closed'
-  priority: TicketPriorityType
-  customerName: string
-  customerEmail: string
-  customerPhone: string
-  customerAddress: string
-  servicePlan: string
-  servicePlanDetails: string
-  createdDate: string
-  assignedDate: string
-  technicianName: string
-  technicianEmail: string
-  technicianPhone: string
+  priority: number
+  status: number
+  createdAt: string
+  resolvedAt?: string | null
+  isDeleted: boolean
+  deleterId?: string | null
+  deletionTime?: string | null
+  lastModificationTime?: string | null
+  lastModifierId?: string | null
+  creationTime: string
+  creatorId: string
 }
 
-// Mock data for support agent assigned tickets
-const mockTickets: Ticket[] = [
-  {
-    id: "1",
-    subject: "Internet connection issues",
-    description: "My internet keeps disconnecting every few hours. This has been happening for the past week.",
-    status: 'InProgress',
-    priority: TicketPriority.High,
-    customerName: "John Customer",
-    customerEmail: "customer@example.com",
-    customerPhone: "+1234567890",
-    customerAddress: "123 Main St, City, State",
-    servicePlan: "Basic Mobile",
-    servicePlanDetails: "Basic Mobile - 2GB data, unlimited calls and texts",
-    createdDate: "10/01/2024",
-    assignedDate: "09/30/2024",
-    technicianName: "John Smith",
-    technicianEmail: "john.smith@company.com",
-    technicianPhone: "+1234567890"
-  },
-  {
-    id: "2",
-    subject: "Service plan upgrade request",
-    description: "I would like to upgrade my current plan to get more data and better coverage.",
-    status: 'Open',
-    priority: TicketPriority.Medium,
-    customerName: "Sarah Wilson",
-    customerEmail: "sarah@example.com",
-    customerPhone: "+1234567891",
-    customerAddress: "456 Oak Ave, City, State",
-    servicePlan: "Premium Mobile",
-    servicePlanDetails: "Premium Mobile - 10GB data, unlimited calls and texts",
-    createdDate: "10/02/2024",
-    assignedDate: "",
-    technicianName: "",
-    technicianEmail: "",
-    technicianPhone: ""
-  }
-]
-
-// Mock data for available technicians
-const availableTechnicians = [
-  { id: "1", name: "John Smith", email: "john.smith@company.com", phone: "+1234567890", specialization: "Network Issues" },
-  { id: "2", name: "Mike Johnson", email: "mike.johnson@company.com", phone: "+1234567892", specialization: "Service Plans" },
-  { id: "3", name: "Sarah Davis", email: "sarah.davis@company.com", phone: "+1234567893", specialization: "Hardware Problems" },
-  { id: "4", name: "David Wilson", email: "david.wilson@company.com", phone: "+1234567894", specialization: "Billing Issues" },
-  { id: "5", name: "Lisa Brown", email: "lisa.brown@company.com", phone: "+1234567895", specialization: "General Support" }
-]
+// Technician interface matching API response
+interface Technician {
+  id: string
+  name: string
+  email: string
+  phoneNumber: string
+  userType: number
+  isActive: boolean
+  supportTickets: any[]
+  userServicePlans: any[]
+  isDeleted: boolean
+  deleterId: string | null
+  deletionTime: string | null
+  lastModificationTime: string | null
+  lastModifierId: string | null
+  creationTime: string
+  creatorId: string | null
+}
 
 export default function SupportAssignedTicketsPage() {
   const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'all'>('active')
@@ -96,49 +78,112 @@ export default function SupportAssignedTicketsPage() {
   const [isTechnicianModalOpen, setIsTechnicianModalOpen] = useState(false)
   const [currentTicketForAction, setCurrentTicketForAction] = useState<Ticket | null>(null)
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>("")
+  
+  // API state
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [, setTotalCount] = useState(0)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  
+  // Technicians state
+  const [technicians, setTechnicians] = useState<Technician[]>([])
+  const [techniciansLoading, setTechniciansLoading] = useState(false)
 
-  const getStatusBadgeVariant = (status: string) => {
+  // Helper functions for status and priority mapping
+  const getStatusDisplay = (status: number) => {
     switch (status) {
-      case 'Open': return 'default'
-      case 'InProgress': return 'secondary'
-      case 'Resolved': return 'outline'
-      case 'Closed': return 'destructive'
-      default: return 'default'
+      case 1: return { text: 'Open', color: 'bg-yellow-100 text-yellow-800' }
+      case 2: return { text: 'In Progress', color: 'bg-blue-100 text-blue-800' }
+      case 3: return { text: 'Resolved', color: 'bg-green-100 text-green-800' }
+      case 4: return { text: 'Closed', color: 'bg-gray-100 text-gray-800' }
+      default: return { text: 'Unknown', color: 'bg-gray-100 text-gray-800' }
     }
   }
 
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'Open': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'InProgress': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'Resolved': return 'bg-green-100 text-green-800 border-green-200'
-      case 'Closed': return 'bg-red-100 text-red-800 border-red-200'
-      default: return 'bg-gray-100 text-gray-800 border-gray-200'
+  const getPriorityDisplay = (priority: number, isAssigned: boolean) => {
+    // Handle priority = 0 or unassigned tickets
+    if (priority === 0 || !isAssigned) {
+      return { text: 'Not Priority Yet', color: 'bg-gray-100 text-gray-800' }
     }
-  }
-
-  const getPriorityBadgeVariant = (priority: TicketPriorityType) => {
     switch (priority) {
-      case TicketPriority.Low: return 'default'
-      case TicketPriority.Medium: return 'outline'
-      case TicketPriority.High: return 'secondary'
-      case TicketPriority.Critical: return 'destructive'
-      default: return 'default'
+      case 1: return { text: 'Low', color: 'bg-blue-100 text-blue-800' }
+      case 2: return { text: 'Medium', color: 'bg-orange-100 text-orange-800' }
+      case 3: return { text: 'High', color: 'bg-red-100 text-red-800' }
+      case 4: return { text: 'Critical', color: 'bg-purple-100 text-purple-800' }
+      default: return { text: 'Not Priority Yet', color: 'bg-gray-100 text-gray-800' }
     }
   }
 
-  const getPriorityBadgeColor = (priority: TicketPriorityType) => {
+  // Fetch tickets from API
+  const fetchTickets = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const response = await apiClient.getSupportTickets()
+      
+      if (response.success && response.data) {
+        setTickets(response.data.items || [])
+        setTotalCount(response.data.totalCount || 0)
+      } else {
+        setError(response.message || 'Failed to fetch tickets')
+        setTickets([])
+        setTotalCount(0)
+      }
+    } catch (err) {
+      console.error('Error fetching tickets:', err)
+      setError('Failed to fetch tickets')
+      setTickets([])
+      setTotalCount(0)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fetch technicians from API
+  const fetchTechnicians = async () => {
+    try {
+      setTechniciansLoading(true)
+      
+      const response = await apiClient.getTechnicians()
+      
+      if (response.success && response.data) {
+        setTechnicians(response.data.items || [])
+      } else {
+        console.error('Failed to fetch technicians:', response.message)
+        setTechnicians([])
+      }
+    } catch (err) {
+      console.error('Error fetching technicians:', err)
+      setTechnicians([])
+    } finally {
+      setTechniciansLoading(false)
+    }
+  }
+
+  // Fetch tickets on component mount
+  useEffect(() => {
+    fetchTickets()
+    fetchTechnicians()
+  }, [])
+
+  // Helper functions for priority modal
+  const getPriorityBadgeColor = (priority: TicketPriorityType | 0) => {
     switch (priority) {
+      case 0: return 'bg-gray-100 text-gray-800 border-gray-200'
       case TicketPriority.Low: return 'bg-blue-100 text-blue-800 border-blue-200'
-      case TicketPriority.Medium: return 'bg-green-100 text-green-800 border-green-200'
-      case TicketPriority.High: return 'bg-purple-100 text-purple-800 border-purple-200'
-      case TicketPriority.Critical: return 'bg-red-100 text-red-800 border-red-200'
+      case TicketPriority.Medium: return 'bg-orange-100 text-orange-800 border-orange-200'
+      case TicketPriority.High: return 'bg-red-100 text-red-800 border-red-200'
+      case TicketPriority.Critical: return 'bg-purple-100 text-purple-800 border-purple-200'
       default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
 
-  const getPriorityLabel = (priority: TicketPriorityType) => {
+  const getPriorityLabel = (priority: TicketPriorityType | 0) => {
     switch (priority) {
+      case 0: return 'Not Priority Yet'
       case TicketPriority.Low: return 'Low'
       case TicketPriority.Medium: return 'Medium'
       case TicketPriority.High: return 'High'
@@ -147,12 +192,14 @@ export default function SupportAssignedTicketsPage() {
     }
   }
 
-  const filteredTickets = mockTickets.filter(ticket => {
+
+  // Filter tickets by status (API already filters by support agent assignment)
+  const filteredTickets = tickets.filter(ticket => {
     switch (activeTab) {
       case 'active':
-        return ticket.status === 'Open' || ticket.status === 'InProgress'
+        return ticket.status === 1 || ticket.status === 2 // Open or In Progress
       case 'completed':
-        return ticket.status === 'Resolved' || ticket.status === 'Closed'
+        return ticket.status === 3 || ticket.status === 4 // Resolved or Closed
       case 'all':
         return true
       default:
@@ -179,12 +226,34 @@ export default function SupportAssignedTicketsPage() {
 
 
 
-  const handlePriorityChange = (priority: TicketPriorityType) => {
+  const handlePriorityChange = async (priority: TicketPriorityType) => {
     if (currentTicketForAction) {
-      // TODO: Update ticket priority via API
-      console.log(`Updating ticket ${currentTicketForAction.id} priority to ${priority}`)
-      setIsPriorityModalOpen(false)
-      setCurrentTicketForAction(null)
+      setActionLoading(currentTicketForAction.id)
+      setError(null)
+      setSuccessMessage(null)
+      
+      try {
+        const response = await apiClient.updateTicketPriority(currentTicketForAction.id, priority)
+        
+        if (response.success) {
+          setSuccessMessage('Ticket priority updated successfully!')
+          
+          // Refresh the tickets data to get the updated priority
+          await fetchTickets()
+          
+          // Clear success message after 3 seconds
+          setTimeout(() => setSuccessMessage(null), 3000)
+        } else {
+          setError(response.message || 'Failed to update ticket priority')
+        }
+      } catch (err) {
+        console.error('Error updating priority:', err)
+        setError('Failed to update ticket priority')
+      } finally {
+        setActionLoading(null)
+        setIsPriorityModalOpen(false)
+        setCurrentTicketForAction(null)
+      }
     }
   }
 
@@ -192,9 +261,20 @@ export default function SupportAssignedTicketsPage() {
     <RoleBasedAccess allowedRoles={[3]} fallback={<div>Access Denied</div>}>
       <div className="p-8 space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Assigned Tickets</h1>
-          <p className="text-muted-foreground">Manage and track assigned support tickets</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Assigned Tickets</h1>
+            <p className="text-muted-foreground">Manage and track assigned support tickets</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchTickets}
+            disabled={loading}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
 
         {/* Tabs */}
@@ -207,7 +287,7 @@ export default function SupportAssignedTicketsPage() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Active Tickets ({mockTickets.filter(t => t.status === 'Open' || t.status === 'InProgress').length})
+            Active Tickets ({tickets.filter(t => t.status === 1 || t.status === 2).length})
           </button>
           <button
             onClick={() => setActiveTab('completed')}
@@ -217,7 +297,7 @@ export default function SupportAssignedTicketsPage() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Completed ({mockTickets.filter(t => t.status === 'Resolved' || t.status === 'Closed').length})
+            Completed ({tickets.filter(t => t.status === 3 || t.status === 4).length})
           </button>
           <button
             onClick={() => setActiveTab('all')}
@@ -227,13 +307,46 @@ export default function SupportAssignedTicketsPage() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            All Tickets ({mockTickets.length})
+            All Tickets ({tickets.length})
           </button>
         </div>
 
+        {/* Success Message */}
+        {successMessage && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-green-600 text-sm">{successMessage}</p>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <LoadingSpinner size="lg" />
+            <span className="ml-2 text-muted-foreground">Loading tickets...</span>
+          </div>
+        )}
+
         {/* Tickets List */}
-        <div className="space-y-4">
-          {filteredTickets.map((ticket) => (
+        {!loading && (
+          <div className="space-y-4">
+            {filteredTickets.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">No tickets found for the selected filter.</p>
+              </div>
+            ) : (
+              filteredTickets.map((ticket) => {
+                const statusDisplay = getStatusDisplay(ticket.status)
+                const isAssigned = !!(ticket.supportagentId || ticket.supportagentName)
+                const priorityDisplay = getPriorityDisplay(ticket.priority, isAssigned)
+                
+                return (
             <Card key={ticket.id} className="overflow-hidden">
               <CardContent className="p-6">
                 {/* Ticket Header */}
@@ -250,13 +363,13 @@ export default function SupportAssignedTicketsPage() {
                     </div>
                   </div>
                   <div className="flex gap-2 ml-4">
-                    <Badge className={`border ${getStatusBadgeColor(ticket.status)}`}>
-                      {ticket.status}
+                    <Badge className={`border ${statusDisplay.color}`}>
+                      {statusDisplay.text}
                     </Badge>
-                    <Badge variant={getPriorityBadgeVariant(ticket.priority)} className={`border ${getPriorityBadgeColor(ticket.priority)}`}>
-                      {getPriorityLabel(ticket.priority)}
+                    <Badge className={`border ${priorityDisplay.color}`}>
+                      {priorityDisplay.text}
                     </Badge>
-                    {ticket.technicianName ? (
+                    {ticket.technicianId ? (
                       <Badge className="bg-green-100 text-green-800 border-green-200 border">
                         <User className="h-3 w-3 mr-1" />
                         Assigned
@@ -275,15 +388,15 @@ export default function SupportAssignedTicketsPage() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-gray-600">
                       <User className="h-4 w-4" />
-                      <span>Customer: {ticket.customerName}</span>
+                      <span>Customer: {ticket.appUserName}</span>
                     </div>
                     <div className="flex items-center gap-2 text-gray-600">
                       <Calendar className="h-4 w-4" />
-                      <span>Created: {ticket.createdDate}</span>
+                      <span>Created: {new Date(ticket.createdAt).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center gap-2 text-gray-600">
                       <Package className="h-4 w-4" />
-                      <span>Plan: {ticket.servicePlan}</span>
+                      <span>Plan: {ticket.servicePlanName || 'Unknown'}</span>
                     </div>
                   </div>
                   
@@ -292,16 +405,14 @@ export default function SupportAssignedTicketsPage() {
                       <User className="h-4 w-4 text-gray-600" />
                       <span className="text-sm font-medium">Technician Assignment:</span>
                     </div>
-                    {ticket.technicianName ? (
+                    {ticket.technicianId ? (
                       <div className="ml-6 space-y-1">
                         <div className="flex items-center gap-2 text-green-700">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           <span className="text-sm font-medium">Assigned</span>
                         </div>
                         <div className="text-xs text-gray-600 ml-4">
-                          <div>{ticket.technicianName}</div>
-                          <div>{ticket.technicianEmail}</div>
-                          <div>Assigned: {ticket.assignedDate}</div>
+                          <div>Technician: {ticket.technicianName || 'Unknown Technician'}</div>
                         </div>
                       </div>
                     ) : (
@@ -311,22 +422,13 @@ export default function SupportAssignedTicketsPage() {
                           <span className="text-sm font-medium">No Technician Assigned</span>
                         </div>
                         <div className="text-xs text-gray-500 ml-4">
-                          Click "Assign New Ticket" to assign a technician
+                          Click "Assign Technician" to assign a technician
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Customer Contact Information */}
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <h4 className="font-medium text-gray-900 mb-2">Customer Contact Information</h4>
-                  <div className="grid grid-cols-3 gap-4 text-sm text-gray-600">
-                    <div>Phone: {ticket.customerPhone}</div>
-                    <div>Email: {ticket.customerEmail}</div>
-                    <div>Address: {ticket.customerAddress}</div>
-                  </div>
-                </div>
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">
@@ -338,7 +440,7 @@ export default function SupportAssignedTicketsPage() {
                     <Eye className="h-4 w-4" />
                     View Details
                   </Button>
-                  {ticket.technicianName ? (
+                  {ticket.technicianId ? (
                     <Button
                       variant="outline"
                       className="flex items-center gap-2 text-green-700 border-green-300 hover:bg-green-50"
@@ -358,24 +460,85 @@ export default function SupportAssignedTicketsPage() {
                   )}
                   <Button
                     className="bg-black hover:bg-gray-800 text-white flex items-center gap-2"
+                    onClick={async () => {
+                      setActionLoading(ticket.id)
+                      setError(null)
+                      setSuccessMessage(null)
+                      
+                      try {
+                        let blob
+                        let fileName
+                        
+                        if (ticket.technicianId) {
+                          // Ticket has technician assigned - use technician report API
+                          blob = await apiClient.generateSupportAgentWithTechnicianReport(ticket.id)
+                          fileName = `SupportAgentWithTechnicianReport_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`
+                        } else {
+                          // Ticket has no technician - use support agent only report API
+                          blob = await apiClient.generateSupportAgentTicketReport(ticket.id)
+                          fileName = `SupportAgentTicketReport_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`
+                        }
+                        
+                        // Create download link and trigger download
+                        const url = window.URL.createObjectURL(blob)
+                        const link = document.createElement('a')
+                        link.href = url
+                        link.download = fileName
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                        window.URL.revokeObjectURL(url)
+                        
+                        setSuccessMessage(`Report downloaded successfully for ticket: ${ticket.subject}`)
+                        setTimeout(() => setSuccessMessage(null), 3000)
+                      } catch (err) {
+                        console.error('Error generating report:', err)
+                        setError('Failed to generate report')
+                      } finally {
+                        setActionLoading(null)
+                      }
+                    }}
+                    disabled={actionLoading === ticket.id}
                   >
-                    <Send className="h-4 w-4" />
-                    Submit Report
+                    {actionLoading === ticket.id ? (
+                      <div className="flex items-center gap-2">
+                        <LoadingSpinner size="sm" />
+                        Generating...
+                      </div>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4" />
+                        Submit Report
+                      </>
+                    )}
                   </Button>
                   <Button
                     variant="outline"
                     className="flex items-center gap-2"
                     onClick={() => handleAssignPriority(ticket)}
+                    disabled={actionLoading === ticket.id}
                   >
-                    <ChevronDown className="h-4 w-4" />
-                    Assign Priority
+                    {actionLoading === ticket.id ? (
+                      <div className="flex items-center gap-2">
+                        <LoadingSpinner size="sm" />
+                        Updating...
+                      </div>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4" />
+                        Assign Priority
+                      </>
+                    )}
                   </Button>
 
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+                )
+              })
+            )}
+          </div>
+        )}
 
         {/* Ticket Details Modal */}
         <Dialog open={isTicketDetailsModalOpen} onOpenChange={setIsTicketDetailsModalOpen}>
@@ -398,28 +561,48 @@ export default function SupportAssignedTicketsPage() {
                 
                 <div>
                   <h3 className="font-medium text-gray-900 mb-2">Service Plan</h3>
-                  <p className="text-gray-600">{selectedTicket.servicePlanDetails}</p>
+                  <p className="text-gray-600">{selectedTicket.servicePlanName || 'Unknown'}</p>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <h3 className="font-medium text-gray-900 mb-2">Customer Information</h3>
                     <div className="space-y-1 text-sm text-gray-600">
-                      <p><strong>Name:</strong> {selectedTicket.customerName}</p>
-                      <p><strong>Email:</strong> {selectedTicket.customerEmail}</p>
-                      <p><strong>Phone:</strong> {selectedTicket.customerPhone}</p>
-                      <p><strong>Address:</strong> {selectedTicket.customerAddress}</p>
+                      <p><strong>Name:</strong> {selectedTicket.appUserName}</p>
+                      <p><strong>Email:</strong> {selectedTicket.appUserEmail || 'Not available'}</p>
+                      <p><strong>Ticket Created:</strong> {new Date(selectedTicket.createdAt).toLocaleDateString()}</p>
                     </div>
                   </div>
                   
                   <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Technician Information</h3>
+                    <h3 className="font-medium text-gray-900 mb-2">Ticket Information</h3>
                     <div className="space-y-1 text-sm text-gray-600">
-                      <p><strong>Name:</strong> {selectedTicket.technicianName}</p>
-                      <p><strong>Email:</strong> {selectedTicket.technicianEmail}</p>
-                      <p><strong>Phone:</strong> {selectedTicket.technicianPhone}</p>
-                      <p><strong>Assigned Date:</strong> {selectedTicket.assignedDate}</p>
+                      <p><strong>Status:</strong> {getStatusDisplay(selectedTicket.status).text}</p>
+                      <p><strong>Priority:</strong> {getPriorityDisplay(selectedTicket.priority, !!(selectedTicket.supportagentId || selectedTicket.supportagentName)).text}</p>
                     </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-2">Technician Assignment</h3>
+                  <div className="space-y-1 text-sm text-gray-600">
+                    {selectedTicket.technicianId ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <p><strong>Status:</strong> Assigned</p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        <p><strong>Status:</strong> Not assigned</p>
+                      </div>
+                    )}
+                    {selectedTicket.technicianId && (
+                      <div className="space-y-1">
+                        <p><strong>Technician:</strong> {selectedTicket.technicianName || 'Unknown Technician'}</p>
+                        <p><strong>Email:</strong> {selectedTicket.technicianEmail || 'Not available'}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -446,11 +629,21 @@ export default function SupportAssignedTicketsPage() {
                     variant="outline"
                     className="w-full justify-start hover:bg-gray-50"
                     onClick={() => handlePriorityChange(priority)}
+                    disabled={actionLoading === currentTicketForAction?.id}
                   >
-                    <Badge className={`border mr-2 ${getPriorityBadgeColor(priority)}`}>
-                      {getPriorityLabel(priority)}
-                    </Badge>
-                    {getPriorityLabel(priority)} Priority
+                    {actionLoading === currentTicketForAction?.id ? (
+                      <div className="flex items-center gap-2">
+                        <LoadingSpinner size="sm" />
+                        Updating...
+                      </div>
+                    ) : (
+                      <>
+                        <Badge className={`border mr-2 ${getPriorityBadgeColor(priority)}`}>
+                          {getPriorityLabel(priority)}
+                        </Badge>
+                        {getPriorityLabel(priority)} Priority
+                      </>
+                    )}
                   </Button>
                 ))}
               </div>
@@ -473,20 +666,33 @@ export default function SupportAssignedTicketsPage() {
                <div className="space-y-4">
                  <div>
                    <label className="text-sm font-medium text-gray-700 mb-2 block">Select Technician</label>
-                                       <Select onValueChange={(value) => {
-                      setSelectedTechnicianId(value)
-                    }} value={selectedTechnicianId}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Choose a technician..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableTechnicians.map((technician) => (
-                          <SelectItem key={technician.id} value={technician.id}>
-                            {technician.name} - {technician.email}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                   {techniciansLoading ? (
+                     <div className="flex items-center justify-center py-4">
+                       <LoadingSpinner size="sm" />
+                       <span className="ml-2 text-sm text-gray-600">Loading technicians...</span>
+                     </div>
+                   ) : (
+                     <Select onValueChange={(value) => {
+                       setSelectedTechnicianId(value)
+                     }} value={selectedTechnicianId}>
+                       <SelectTrigger className="w-full">
+                         <SelectValue placeholder="Choose a technician..." />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {technicians.length === 0 ? (
+                           <SelectItem value="" disabled>
+                             No technicians available
+                           </SelectItem>
+                         ) : (
+                           technicians.map((technician) => (
+                             <SelectItem key={technician.id} value={technician.id}>
+                               {technician.name} - {technician.email}
+                             </SelectItem>
+                           ))
+                         )}
+                       </SelectContent>
+                     </Select>
+                   )}
                  </div>
                </div>
                
@@ -500,21 +706,48 @@ export default function SupportAssignedTicketsPage() {
                  </Button>
                  <Button
                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white flex-1 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                   onClick={() => {
-                     if (selectedTechnicianId) {
-                       const technician = availableTechnicians.find(t => t.id === selectedTechnicianId)
-                       if (technician) {
-                         // TODO: Update ticket technician via API
-                         console.log(`Assigning technician ${technician.name} to ticket ${currentTicketForAction?.id}`)
-                         setIsTechnicianModalOpen(false)
-                         setCurrentTicketForAction(null)
-                         setSelectedTechnicianId("")
+                   onClick={async () => {
+                     if (selectedTechnicianId && currentTicketForAction) {
+                       setActionLoading(currentTicketForAction.id)
+                       setError(null)
+                       setSuccessMessage(null)
+                       
+                       try {
+                         const response = await apiClient.assignTechnicianToTicket(currentTicketForAction.id, selectedTechnicianId)
+                         
+                         if (response.success) {
+                           const technician = technicians.find(t => t.id === selectedTechnicianId)
+                           setSuccessMessage(`Technician ${technician?.name || 'Unknown'} assigned successfully!`)
+                           setTimeout(() => setSuccessMessage(null), 3000)
+                           
+                           // Refresh tickets to show updated assignment
+                           await fetchTickets()
+                           
+                           // Close modal and reset state
+                           setIsTechnicianModalOpen(false)
+                           setCurrentTicketForAction(null)
+                           setSelectedTechnicianId("")
+                         } else {
+                           setError(response.message || 'Failed to assign technician')
+                         }
+                       } catch (err) {
+                         console.error('Error assigning technician:', err)
+                         setError('Failed to assign technician')
+                       } finally {
+                         setActionLoading(null)
                        }
                      }
                    }}
-                   disabled={!selectedTechnicianId}
+                   disabled={!selectedTechnicianId || actionLoading === currentTicketForAction?.id}
                  >
-                   Assign
+                   {actionLoading === currentTicketForAction?.id ? (
+                     <div className="flex items-center gap-2">
+                       <LoadingSpinner size="sm" />
+                       Assigning...
+                     </div>
+                   ) : (
+                     'Assign'
+                   )}
                  </Button>
                </div>
              </div>

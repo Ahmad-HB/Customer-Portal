@@ -81,6 +81,7 @@ export interface LoginResponse {
 export interface User extends AbpEntity {
   username: string
   name: string
+  surname?: string
   email: string
   phone: string
   password?: string // Only for registration
@@ -95,6 +96,7 @@ export interface User extends AbpEntity {
 export interface RegisterRequest {
   username: string
   name: string
+  surname?: string
   email: string
   phone: string
   password: string
@@ -765,110 +767,37 @@ class ApiClient {
     }
   }
 
-  async updateUser(userData: Partial<User>): Promise<ApiResponse<User>> {
+  async updateUser(userData: Partial<User> & { surname?: string; concurrencyStamp?: string }): Promise<ApiResponse<User>> {
     // Map frontend User fields to backend API structure
     const updatePayload = {
       userName: userData.username,
       email: userData.email,
       name: userData.name,
-      surname: '', // Backend expects this but frontend User doesn't have it
-      phoneNumber: userData.phone
+      surname: userData.surname || '',
+      phoneNumber: userData.phone,
+      concurrencyStamp: userData.concurrencyStamp || ''
     }
 
     try {
-      const response = await fetch(`${this.baseURL}/api/account/my-profile`, {
+      const result = await this.request<User>('/api/account/my-profile', {
         method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.getToken()}`
-        },
-        body: JSON.stringify(updatePayload),
-        credentials: 'include'
+        body: JSON.stringify(updatePayload)
       })
 
-      console.log('Update user response status:', response.status)
+      console.log('Update user result:', result)
 
-      if (!response.ok) {
-        let errorMessage = 'Profile update failed'
-        
-        try {
-          const errorData = await response.json()
-          console.log('Update user error data:', errorData)
-          
-          if (errorData.error?.message) {
-            errorMessage = errorData.error.message
-          } else if (errorData.error?.details) {
-            errorMessage = errorData.error.details
-          }
-        } catch (jsonError) {
-          console.log('Could not parse error response as JSON')
-          errorMessage = `Profile update failed with status ${response.status}`
+      if (result.success) {
+        return {
+          data: result.data || userData as User,
+          success: true,
+          message: 'Profile updated successfully'
         }
-        
+      } else {
         return {
           data: null as unknown as User,
           success: false,
-          message: errorMessage
+          message: result.message || 'Profile update failed'
         }
-      }
-
-      let data
-      try {
-        const responseText = await response.text()
-        console.log('Raw update user response text:', responseText)
-        
-        if (!responseText.trim()) {
-          console.log('Empty response, treating as successful update')
-          // Return success with the data that was sent
-          return { 
-            data: userData as User,
-            success: true,
-            message: 'Profile updated successfully'
-          }
-        }
-        
-        data = JSON.parse(responseText)
-        console.log('Update user success data:', data)
-      } catch (jsonError) {
-        console.log('Could not parse success response as JSON:', jsonError)
-        // Return success with the data that was sent
-        return { 
-          data: userData as User,
-          success: true,
-          message: 'Profile updated successfully'
-        }
-      }
-      
-      // Map backend response to frontend User interface
-      if (data) {
-        const updatedUser: User = {
-          id: data.id || '',
-          username: data.userName || userData.username || '',
-          name: data.name || userData.name || '',
-          email: data.email || userData.email || '',
-          phone: data.phoneNumber || userData.phone || '',
-          role: 'customer', // Default role
-          emailConfirmed: true, // Assume confirmed after update
-          phoneNumberConfirmed: true, // Assume confirmed after update
-          creationTime: new Date().toISOString(),
-          creatorId: '',
-          lastModificationTime: new Date().toISOString(),
-          lastModifierId: '',
-          isDeleted: false
-        }
-        
-        return {
-          data: updatedUser,
-          success: true,
-          message: 'Profile updated successfully'
-        }
-      }
-      
-      return {
-        data: null as unknown as User,
-        success: false,
-        message: 'Profile update failed - no data received'
       }
       
     } catch (error) {
@@ -882,21 +811,21 @@ class ApiClient {
   }
 
   async register(userData: RegisterRequest): Promise<ApiResponse<User>> {
-    // ABP.io RegisterDto structure with extended properties
+    // New registration API structure
     const registerPayload = {
       userName: userData.username,
       emailAddress: userData.email,
       password: userData.password,
-      appName: 'CustomerPortal',
-      // Extended properties for Name and PhoneNumber
-      extraProperties: {
-        Name: userData.name,
-        PhoneNumber: userData.phone
-      }
+      appName: "CustomerPortal", // Adding appName as it might be required
+      name: userData.name,
+      phoneNumber: userData.phone
     }
 
     try {
-      const response = await fetch(`${this.baseURL}/api/account/register`, {
+      console.log('🔍 [Register] Sending registration request with payload:', registerPayload)
+      console.log('🔍 [Register] Request URL:', `${this.baseURL}/api/app/custom-account/register-with-phone`)
+      
+      const response = await fetch(`${this.baseURL}/api/app/custom-account/register-with-phone`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -914,15 +843,22 @@ class ApiClient {
         try {
           const errorData = await response.json()
           console.log('Register error data:', errorData)
+          console.log('Register request payload:', registerPayload)
           
           if (errorData.error?.message) {
             errorMessage = errorData.error.message
           } else if (errorData.error?.details) {
             errorMessage = errorData.error.details
+          } else if (errorData.message) {
+            errorMessage = errorData.message
+          } else if (errorData.details) {
+            errorMessage = errorData.details
           }
         } catch (jsonError) {
           console.log('Could not parse error response as JSON')
-          errorMessage = `Registration failed with status ${response.status}`
+          const errorText = await response.text()
+          console.log('Raw error response:', errorText)
+          errorMessage = `Registration failed with status ${response.status}: ${errorText}`
         }
         
         return {
@@ -958,18 +894,19 @@ class ApiClient {
       }
       
       // Handle ABP.IO registration response format
-      if (data.result && data.result.id) {
+      // The API returns user data directly, not wrapped in result
+      if (data.id) {
         // Registration successful, return user data
         const user: User = {
-          id: data.result.id,
-          username: data.result.userName,
-          name: userData.name,
-          email: data.result.email,
-          phone: userData.phone,
+          id: data.id,
+          username: data.userName,
+          name: data.name || userData.name, // Use API response name or fallback to form data
+          email: data.email,
+          phone: data.phoneNumber || userData.phone, // Use API response phone or fallback to form data
           role: 'customer',
-          emailConfirmed: false,
-          phoneNumberConfirmed: false,
-          creationTime: new Date().toISOString()
+          emailConfirmed: data.emailConfirmed || false,
+          phoneNumberConfirmed: data.phoneNumberConfirmed || false,
+          creationTime: data.creationTime || new Date().toISOString()
         }
         
         return { 
@@ -990,6 +927,118 @@ class ApiClient {
         data: null as unknown as User,
         success: false,
         message: error instanceof Error ? error.message : 'Network error during registration'
+      }
+    }
+  }
+
+  // Admin user creation API
+  async adminCreateUser(userData: RegisterRequest & { userType: number }): Promise<ApiResponse<User>> {
+    const registerPayload = {
+      userName: userData.username,
+      emailAddress: userData.email,
+      password: userData.password,
+      appName: "CustomerPortal", // Adding appName as it might be required
+      name: userData.name,
+      phoneNumber: userData.phone,
+      userType: userData.userType
+    }
+
+    try {
+      const response = await fetch(`${this.baseURL}/api/app/custom-account/admin-register-user`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(registerPayload),
+        credentials: 'include'
+      })
+
+      console.log('Admin create user response status:', response.status)
+
+      if (!response.ok) {
+        let errorMessage = 'User creation failed'
+        
+        try {
+          const errorData = await response.json()
+          console.log('Admin create user error data:', errorData)
+          
+          if (errorData.error?.message) {
+            errorMessage = errorData.error.message
+          } else if (errorData.error?.details) {
+            errorMessage = errorData.error.details
+          }
+        } catch (jsonError) {
+          console.log('Could not parse error response as JSON')
+          errorMessage = `User creation failed with status ${response.status}`
+        }
+        
+        return {
+          data: null as unknown as User,
+          success: false,
+          message: errorMessage
+        }
+      }
+
+      let data
+      try {
+        const responseText = await response.text()
+        console.log('Raw admin create user response text:', responseText)
+        
+        if (!responseText.trim()) {
+          console.log('Empty response, treating as successful user creation')
+          return { 
+            data: null as unknown as User,
+            success: true,
+            message: 'User created successfully'
+          }
+        }
+        
+        data = JSON.parse(responseText)
+        console.log('Admin create user success data:', data)
+      } catch (jsonError) {
+        console.log('Could not parse success response as JSON:', jsonError)
+        return { 
+          data: null as unknown as User,
+          success: true,
+          message: 'User created successfully'
+        }
+      }
+      
+      // Handle successful user creation
+      if (data && data.id) {
+        const user: User = {
+          id: data.id,
+          username: data.userName || userData.username,
+          name: data.name || userData.name,
+          email: data.email || userData.email,
+          phone: data.phoneNumber || userData.phone,
+          role: userData.userType === 1 ? 'admin' : 
+                userData.userType === 2 ? 'customer' :
+                userData.userType === 3 ? 'supportAgent' : 'technician',
+          emailConfirmed: false,
+          phoneNumberConfirmed: false,
+          creationTime: new Date().toISOString()
+        }
+        
+        return { 
+          data: user,
+          success: true,
+          message: 'User created successfully'
+        }
+      }
+      
+      return { 
+        data: null as unknown as User,
+        success: true,
+        message: 'User created successfully'
+      }
+    } catch (error) {
+      console.error('Admin create user request failed:', error)
+      return {
+        data: null as unknown as User,
+        success: false,
+        message: error instanceof Error ? error.message : 'Network error during user creation'
       }
     }
   }
@@ -1303,31 +1352,6 @@ class ApiClient {
     }
   }
 
-  // Suspend User Service Plan
-  async suspendUserServicePlan(id: string): Promise<ApiResponse<void>> {
-    console.log(`Suspending user service plan with ID: ${id}`)
-    console.log(`Calling endpoint: /api/app/user-service-plan/${id}/suspend-user-service-plan`)
-    
-    const result = await this.request<void>(`/api/app/user-service-plan/${id}/suspend-user-service-plan`, {
-      method: 'POST',
-    })
-    
-    console.log('Suspend result:', result)
-    return result
-  }
-
-  // Reactivate User Service Plan
-  async reactivateUserServicePlan(id: string): Promise<ApiResponse<void>> {
-    console.log(`Reactivating user service plan with ID: ${id}`)
-    console.log(`Calling endpoint: /api/app/user-service-plan/${id}/reactivate-user-service-plan`)
-    
-    const result = await this.request<void>(`/api/app/user-service-plan/${id}/reactivate-user-service-plan`, {
-      method: 'POST',
-    })
-    
-    console.log('Reactivate result:', result)
-    return result
-  }
 
   // Service Plans
   async getServicePlans(_params?: {
@@ -1525,22 +1549,213 @@ class ApiClient {
     })
   }
 
-  // Support Agent specific
-  async getSupportTickets(params?: {
-    skipCount?: number
-    maxResultCount?: number
-    sorting?: string
-    filter?: string
-  }): Promise<ApiResponse<AbpPagedResult<Ticket>>> {
+  async submitTechnicianReport(ticketId: string, workPerformed: string): Promise<ApiResponse<Blob>> {
     const queryParams = new URLSearchParams()
-    if (params?.skipCount) queryParams.append('SkipCount', params.skipCount.toString())
-    if (params?.maxResultCount) queryParams.append('MaxResultCount', params.maxResultCount.toString())
-    if (params?.sorting) queryParams.append('Sorting', params.sorting)
-    if (params?.filter) queryParams.append('Filter', params.filter)
+    queryParams.append('workPerformed', workPerformed)
     
     const query = queryParams.toString()
-    const endpoint = query ? `/api/app/support/tickets?${query}` : '/api/app/support/tickets'
-    return this.request<AbpPagedResult<Ticket>>(endpoint)
+    const endpoint = `/api/app/report/generate-technician-report/${ticketId}?${query}`
+    
+    try {
+      const response = await fetch(`${this.baseURL}${endpoint}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/pdf',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const pdfBlob = await response.blob()
+      
+      // Trigger download
+      const url = window.URL.createObjectURL(pdfBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `TechnicianReport_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      return {
+        success: true,
+        data: pdfBlob,
+        message: 'Report generated and downloaded successfully'
+      }
+    } catch (error) {
+      console.error('Error generating technician report:', error)
+      return {
+        success: false,
+        data: null as any,
+        message: error instanceof Error ? error.message : 'Failed to generate report'
+      }
+    }
+  }
+
+  // Get Support Tickets
+  async getSupportTickets(): Promise<ApiResponse<{
+    items: Array<{
+      id: string;
+      creationTime: string;
+      creatorId: string;
+      lastModificationTime: string;
+      lastModifierId: string;
+      isDeleted: boolean;
+      deleterId?: string;
+      deletionTime?: string;
+      appUserId: string;
+      appUserName: string;
+      supportagentId?: string;
+      supportagentName?: string;
+      technicianId?: string;
+      identityUserName: string;
+      servicePlanId: string;
+      servicePlanName: string;
+      subject: string;
+      description: string;
+      priority: number;
+      status: number;
+      createdAt: string;
+      resolvedAt?: string;
+    }>;
+    totalCount: number;
+  }>> {
+    try {
+      console.log('🔍 [Support Tickets] Fetching from: /api/app/support-ticket/support-tickets')
+      console.log('🔍 [Support Tickets] Full URL:', `${this.baseURL}/api/app/support-ticket/support-tickets`)
+      
+      const response = await fetch(`${this.baseURL}/api/app/support-ticket/support-tickets`, {
+        method: 'GET',
+        headers: { 
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+
+      console.log('🔍 [Support Tickets] Response status:', response.status)
+      console.log('🔍 [Support Tickets] Response headers:', Object.fromEntries(response.headers.entries()))
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to fetch support tickets'
+        let shouldReturnEmpty = false
+        
+        try {
+          const errorData = await response.json()
+          console.log('Get support tickets error data:', errorData)
+          
+          // Check if this is a "no tickets found" scenario vs a real error
+          if (response.status === 500) {
+            // For 500 errors, check if it's actually a "no data" response
+            if (errorData.error?.message?.toLowerCase().includes('not found') ||
+                errorData.error?.message?.toLowerCase().includes('no tickets') ||
+                errorData.error?.message?.toLowerCase().includes('empty') ||
+                errorData.message?.toLowerCase().includes('not found') ||
+                errorData.message?.toLowerCase().includes('no tickets') ||
+                errorData.message?.toLowerCase().includes('empty')) {
+              console.log('No tickets found for user - treating as empty result')
+              shouldReturnEmpty = true
+            }
+          }
+          
+          if (!shouldReturnEmpty) {
+            if (errorData.error?.message) {
+              errorMessage = errorData.error.message
+            } else if (errorData.error?.details) {
+              errorMessage = errorData.error.details
+            } else if (errorData.message) {
+              errorMessage = errorData.message
+            } else if (errorData.details) {
+              errorMessage = errorData.details
+            }
+          }
+        } catch (jsonError) {
+          console.log('Could not parse error response as JSON')
+          const errorText = await response.text()
+          console.log('Raw error response:', errorText)
+          
+          // Check if the raw text suggests "no data"
+          if (response.status === 500 && (
+              errorText.toLowerCase().includes('not found') ||
+              errorText.toLowerCase().includes('no tickets') ||
+              errorText.toLowerCase().includes('empty') ||
+              errorText === '' ||
+              errorText === 'null'
+            )) {
+            console.log('No tickets found for user (raw text) - treating as empty result')
+            shouldReturnEmpty = true
+          } else {
+            errorMessage = `Failed to fetch support tickets with status ${response.status}: ${errorText}`
+          }
+        }
+        
+        if (shouldReturnEmpty) {
+          // Return empty result instead of error
+          return {
+            data: { items: [], totalCount: 0 },
+            success: true,
+            message: 'No tickets found'
+          }
+        }
+        
+        return {
+          data: { items: [], totalCount: 0 },
+          success: false,
+          message: errorMessage
+        }
+      }
+
+      const data = await response.json()
+      console.log('🔍 [Support Tickets] Success data:', data)
+      console.log('🔍 [Support Tickets] Data type:', typeof data)
+      console.log('🔍 [Support Tickets] Is array:', Array.isArray(data))
+      
+      // Handle different response structures
+      let ticketsData = data
+      
+      if (Array.isArray(data)) {
+        if (data.length === 0) {
+          // Empty array - no tickets
+          ticketsData = { items: [], totalCount: 0 }
+        } else if (data.length === 1 && data[0].items) {
+          // Array with one object containing items
+          ticketsData = data[0]
+        } else {
+          // Array of ticket objects directly
+          ticketsData = { items: data, totalCount: data.length }
+        }
+      } else if (data && typeof data === 'object') {
+        // Object response
+        if (data.items) {
+          ticketsData = data
+        } else {
+          // Single ticket object
+          ticketsData = { items: [data], totalCount: 1 }
+        }
+      } else {
+        // Unexpected response format
+        console.log('🔍 [Support Tickets] Unexpected response format, treating as empty')
+        ticketsData = { items: [], totalCount: 0 }
+      }
+      
+      console.log('🔍 [Support Tickets] Processed tickets data:', ticketsData)
+      
+      return { 
+        data: ticketsData,
+        success: true,
+        message: 'Support tickets fetched successfully'
+      }
+    } catch (error) {
+      console.error('Get support tickets error:', error)
+      return {
+        data: { items: [], totalCount: 0 },
+        success: false,
+        message: 'Failed to fetch support tickets'
+      }
+    }
   }
 
   async assignTicket(ticketId: string, technicianId: string): Promise<ApiResponse<Ticket>> {
@@ -1548,6 +1763,44 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ technicianId }),
     })
+  }
+
+  async assignTechnicianToTicket(supportTicketId: string, technicianId: string): Promise<ApiResponse<any>> {
+    return this.request<any>(`/api/app/support-ticket/assign-technician?supportTicketId=${supportTicketId}&technicianId=${technicianId}`, {
+      method: 'POST',
+    })
+  }
+
+  async generateSupportAgentTicketReport(ticketId: string): Promise<Blob> {
+    const response = await fetch(`${this.baseURL}/api/app/report/generate-support-agent-ticket-report/${ticketId}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Accept': 'application/pdf',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to generate report: ${response.status}`)
+    }
+
+    return response.blob()
+  }
+
+  async generateSupportAgentWithTechnicianReport(ticketId: string): Promise<Blob> {
+    const response = await fetch(`${this.baseURL}/api/app/report/generate-support-agent-with-technician-report/${ticketId}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Accept': 'application/pdf',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to generate report: ${response.status}`)
+    }
+
+    return response.blob()
   }
 
   // Admin specific
@@ -1580,6 +1833,428 @@ class ApiClient {
   async getCurrentTenant(): Promise<ApiResponse<any>> {
     return this.request<any>('/api/multi-tenancy/current-tenant')
   }
+
+  // Support Ticket APIs
+  async createSupportTicket(ticketData: {
+    servicePlanId: string;
+    subject: string;
+    description: string;
+  }): Promise<ApiResponse<any>> {
+    const payload = {
+      id: crypto.randomUUID(), // Generate a new UUID for the ticket
+      servicePlanId: ticketData.servicePlanId,
+      subject: ticketData.subject,
+      description: ticketData.description
+    }
+
+    try {
+      const response = await fetch(`${this.baseURL}/api/app/support-ticket/support-ticket`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload),
+        credentials: 'include'
+      })
+
+      console.log('Create support ticket response status:', response.status)
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to create support ticket'
+        
+        try {
+          const errorData = await response.json()
+          console.log('Create ticket error data:', errorData)
+          
+          if (errorData.error?.message) {
+            errorMessage = errorData.error.message
+          } else if (errorData.error?.details) {
+            errorMessage = errorData.error.details
+          } else if (errorData.message) {
+            errorMessage = errorData.message
+          } else if (errorData.details) {
+            errorMessage = errorData.details
+          }
+        } catch (jsonError) {
+          console.log('Could not parse error response as JSON')
+          const errorText = await response.text()
+          console.log('Raw error response:', errorText)
+          errorMessage = `Failed to create support ticket with status ${response.status}: ${errorText}`
+        }
+        
+        return {
+          data: null,
+          success: false,
+          message: errorMessage
+        }
+      }
+
+      // Handle response parsing more carefully
+      let data = null
+      try {
+        const responseText = await response.text()
+        console.log('Create support ticket raw response:', responseText)
+        
+        if (responseText && responseText.trim() !== '') {
+          data = JSON.parse(responseText)
+          console.log('Create support ticket parsed data:', data)
+        } else {
+          console.log('Create support ticket: Empty response body')
+          data = null
+        }
+      } catch (parseError) {
+        console.log('Create support ticket: Could not parse response as JSON, treating as success')
+        data = null
+      }
+      
+      return { 
+        data: data,
+        success: true,
+        message: 'Support ticket created successfully'
+      }
+    } catch (error) {
+      console.error('Create support ticket error:', error)
+      return {
+        data: null,
+        success: false,
+        message: 'Failed to create support ticket'
+      }
+    }
+  }
+
+  // Service Plan Management Methods
+  async suspendUserServicePlan(id: string, suspensionReason: string): Promise<ApiResponse<any>> {
+    try {
+      console.log('🔍 [Suspend Plan] Sending suspend request:', { id, suspensionReason })
+      
+      const result = await this.request<any>('/api/app/user-service-plan/suspend-user-service-plan', {
+        method: 'POST',
+        body: JSON.stringify({
+          id,
+          suspensionReason
+        })
+      })
+
+      console.log('Suspend plan result:', result)
+      
+      if (result.success) {
+        return { 
+          data: result.data,
+          success: true,
+          message: 'Service plan suspended successfully'
+        }
+      } else {
+        return {
+          data: null,
+          success: false,
+          message: result.message || 'Failed to suspend service plan'
+        }
+      }
+    } catch (error) {
+      console.error('Suspend plan error:', error)
+      return {
+        data: null,
+        success: false,
+        message: 'Failed to suspend service plan'
+      }
+    }
+  }
+
+  async reactivateUserServicePlan(id: string): Promise<ApiResponse<any>> {
+    try {
+      console.log('🔍 [Reactivate Plan] Sending reactivate request:', { id })
+      
+      const result = await this.request<any>(`/api/app/user-service-plan/${id}/reactivate-user-service-plan`, {
+        method: 'POST'
+      })
+
+      console.log('Reactivate plan result:', result)
+      
+      if (result.success) {
+        return { 
+          data: result.data,
+          success: true,
+          message: 'Service plan reactivated successfully'
+        }
+      } else {
+        return {
+          data: null,
+          success: false,
+          message: result.message || 'Failed to reactivate service plan'
+        }
+      }
+    } catch (error) {
+      console.error('Reactivate plan error:', error)
+      return {
+        data: null,
+        success: false,
+        message: 'Failed to reactivate service plan'
+      }
+    }
+  }
+
+  async cancelUserServicePlan(id: string): Promise<ApiResponse<any>> {
+    try {
+      console.log('🔍 [Cancel Plan] Sending cancel request:', { id })
+      
+      const result = await this.request<any>(`/api/app/user-service-plan/${id}/cancel-user-service-plan`, {
+        method: 'POST'
+      })
+
+      console.log('Cancel plan result:', result)
+      
+      if (result.success) {
+        return { 
+          data: result.data,
+          success: true,
+          message: 'Service plan cancelled successfully'
+        }
+      } else {
+        return {
+          data: null,
+          success: false,
+          message: result.message || 'Failed to cancel service plan'
+        }
+      }
+    } catch (error) {
+      console.error('Cancel plan error:', error)
+      return {
+        data: null,
+        success: false,
+        message: 'Failed to cancel service plan'
+      }
+    }
+  }
+
+  async updateTicketPriority(ticketId: string, priority: number): Promise<ApiResponse<any>> {
+    try {
+      console.log('🔍 [Update Priority] Sending priority update request:', { ticketId, priority })
+      
+      const result = await this.request<any>(`/api/app/support-ticket/ticket-priority/${ticketId}?priority=${priority}`, {
+        method: 'PUT'
+      })
+
+      console.log('Update priority result:', result)
+      
+      if (result.success) {
+        return { 
+          data: result.data,
+          success: true,
+          message: 'Ticket priority updated successfully'
+        }
+      } else {
+        return {
+          data: null,
+          success: false,
+          message: result.message || 'Failed to update ticket priority'
+        }
+      }
+    } catch (error) {
+      console.error('Update priority error:', error)
+      return {
+        data: null,
+        success: false,
+        message: 'Failed to update ticket priority'
+      }
+    }
+  }
+
+  async getTechnicians(): Promise<ApiResponse<{
+    totalCount: number
+    items: Array<{
+      id: string
+      name: string
+      email: string
+      phoneNumber: string
+      userType: number
+      isActive: boolean
+      supportTickets: any[]
+      userServicePlans: any[]
+      isDeleted: boolean
+      deleterId: string | null
+      deletionTime: string | null
+      lastModificationTime: string | null
+      lastModifierId: string | null
+      creationTime: string
+      creatorId: string | null
+    }>
+  }>> {
+    try {
+      console.log('🔍 [Get Technicians] Fetching technicians...')
+      
+      const result = await this.request<{
+        totalCount: number
+        items: Array<{
+          id: string
+          name: string
+          email: string
+          phoneNumber: string
+          userType: number
+          isActive: boolean
+          supportTickets: any[]
+          userServicePlans: any[]
+          isDeleted: boolean
+          deleterId: string | null
+          deletionTime: string | null
+          lastModificationTime: string | null
+          lastModifierId: string | null
+          creationTime: string
+          creatorId: string | null
+        }>
+      }>('/api/app/app-user/technicians', {
+        method: 'GET'
+      })
+
+      console.log('Get technicians result:', result)
+      
+      if (result.success) {
+        return { 
+          data: result.data,
+          success: true,
+          message: 'Technicians fetched successfully'
+        }
+      } else {
+        return {
+          data: { totalCount: 0, items: [] },
+          success: false,
+          message: result.message || 'Failed to fetch technicians'
+        }
+      }
+    } catch (error) {
+      console.error('Get technicians error:', error)
+      return {
+        data: { totalCount: 0, items: [] },
+        success: false,
+        message: 'Failed to fetch technicians'
+      }
+    }
+  }
+
+  // Get all users
+  async getUsers(): Promise<ApiResponse<{
+    totalCount: number;
+    items: Array<{
+      id: string;
+      name: string;
+      username: string;
+      email: string;
+      phoneNumber: string;
+      userType: number;
+      role: string;
+      isActive: boolean;
+      supportTickets: any[];
+      userServicePlans: any[];
+      isDeleted: boolean;
+      deleterId?: string;
+      deletionTime?: string;
+      lastModificationTime?: string;
+      lastModifierId?: string;
+      creationTime: string;
+      creatorId?: string;
+    }>;
+  }>> {
+    try {
+      console.log('🔍 [Users] Fetching from: /api/app/app-user/users')
+      console.log('🔍 [Users] Full URL:', `${this.baseURL}/api/app/app-user/users`)
+      
+      const response = await fetch(`${this.baseURL}/api/app/app-user/users`, {
+        method: 'GET',
+        headers: { 
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+
+      console.log('🔍 [Users] Response status:', response.status)
+      console.log('🔍 [Users] Response headers:', Object.fromEntries(response.headers.entries()))
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to fetch users'
+        
+        try {
+          const errorData = await response.json()
+          console.log('Get users error data:', errorData)
+          
+          if (errorData.error?.message) {
+            errorMessage = errorData.error.message
+          } else if (errorData.error?.details) {
+            errorMessage = errorData.error.details
+          } else if (errorData.message) {
+            errorMessage = errorData.message
+          }
+        } catch (parseError) {
+          console.log('Could not parse error response:', parseError)
+        }
+        
+        throw new Error(errorMessage)
+      }
+
+      const data = await response.json()
+      console.log('🔍 [Users] Success response:', data)
+      
+      return {
+        success: true,
+        data: data,
+        message: 'Users fetched successfully'
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error)
+      return {
+        success: false,
+        data: { totalCount: 0, items: [] },
+        message: error instanceof Error ? error.message : 'Failed to fetch users'
+      }
+    }
+  }
+
+  // Generate Monthly Summary Report
+  async generateSummaryReport(startDate: string, endDate: string): Promise<ApiResponse<Blob>> {
+    try {
+      const queryParams = new URLSearchParams()
+      queryParams.append('startDate', startDate)
+      queryParams.append('endDate', endDate)
+      const query = queryParams.toString()
+      const endpoint = `/api/app/report/generate-summary-report?${query}`
+      
+      const response = await fetch(`${this.baseURL}${endpoint}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Accept': 'application/pdf' },
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const pdfBlob = await response.blob()
+      
+      // Trigger download
+      const url = window.URL.createObjectURL(pdfBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `SummaryReport_${startDate}_to_${endDate}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      return {
+        success: true,
+        data: pdfBlob,
+        message: 'Summary report generated and downloaded successfully'
+      }
+    } catch (error) {
+      console.error('Error generating summary report:', error)
+      return {
+        success: false,
+        data: null as any,
+        message: error instanceof Error ? error.message : 'Failed to generate summary report'
+      }
+    }
+  }
+
+
 }
 
 // Export singleton instance

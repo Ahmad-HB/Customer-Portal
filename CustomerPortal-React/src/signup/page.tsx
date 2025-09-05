@@ -58,10 +58,11 @@ export default function SignupPage() {
           navigate("/login")
         }, 2000)
       } else {
-        setError("Registration failed. Please try again.")
+        setError("Registration failed. Please check your information and try again.")
       }
     } catch (err) {
-      setError("Registration failed. Please try again.")
+      console.error('Registration error:', err)
+      setError("Registration failed. Please check your information and try again.")
     } finally {
       setIsLoading(false)
     }

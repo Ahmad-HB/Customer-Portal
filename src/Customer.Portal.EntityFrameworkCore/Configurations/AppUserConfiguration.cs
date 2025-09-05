@@ -15,6 +15,8 @@ public class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
         
         builder.Property(x => x.Name).IsRequired().HasMaxLength(256);
         
+        builder.Property(x => x.UserName).IsRequired().HasMaxLength(128);
+        
         builder.Property(x => x.UserType).IsRequired();
         
         builder.Property(x => x.PhoneNumber).HasMaxLength(15);

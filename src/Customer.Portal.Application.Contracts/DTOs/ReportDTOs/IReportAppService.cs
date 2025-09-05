@@ -11,5 +11,15 @@ namespace Customer.Portal.DTOs.ReportDTOs;
 
 public interface IReportAppService : IApplicationService
 {
-    public Task<IActionResult> GenerateReportAsync(ReportTypes reportType, Guid? ticketId, DateTime? startDate, DateTime? endDate);
+    public Task<IActionResult> GenerateReportAsync(ReportTypes reportType, Guid? ticketId, DateTime? startDate, DateTime? endDate, string? workPerformed);
+    
+
+    public Task<IActionResult> GenerateSupportAgentTicketReportAsync(Guid ticketId);
+    
+    public Task<IActionResult> GenerateSupportAgentWithTechnicianReportAsync(Guid ticketId);
+
+    public Task<IActionResult> GenerateTechnicianReportAsync(Guid ticketId, string workPerformed);
+    
+
+    public Task<IActionResult> GenerateSummaryReportAsync(DateTime startDate, DateTime endDate);
 }

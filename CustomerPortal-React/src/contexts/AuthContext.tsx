@@ -97,20 +97,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check if user is already authenticated on app load
   useEffect(() => {
-    // Immediately check session on app load
-    checkSession().finally(() => {
-      setIsLoading(false)
-    })
+    let isMounted = true
+    
+    const initializeAuth = async () => {
+      try {
+        console.log('Initializing authentication...')
+        await checkSession()
+      } catch (error) {
+        console.error('Auth initialization error:', error)
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+          console.log('Auth initialization complete')
+        }
+      }
+    }
+    
+    initializeAuth()
     
     // Also check session after a short delay to handle any race conditions
     const immediateCheck = setTimeout(() => {
-      if (!user) {
+      if (isMounted && !user) {
         console.log('Performing immediate session re-check...')
         checkSession()
       }
     }, 1000)
     
-    return () => clearTimeout(immediateCheck)
+    return () => {
+      isMounted = false
+      clearTimeout(immediateCheck)
+    }
   }, [])
 
   // Set up periodic session checking and focus-based checking

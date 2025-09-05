@@ -80,6 +80,11 @@ namespace Customer.Portal.Migrations
                         .HasMaxLength(15)
                         .HasColumnType("varchar(15)");
 
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
                     b.Property<int>("UserType")
                         .HasColumnType("int");
 
@@ -2502,7 +2507,7 @@ namespace Customer.Portal.Migrations
             modelBuilder.Entity("Customer.Portal.Entities.TicketComment", b =>
                 {
                     b.HasOne("Customer.Portal.Entities.SupportTicket", "Ticket")
-                        .WithMany("TicketComments")
+                        .WithMany()
                         .HasForeignKey("TicketId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -2693,11 +2698,6 @@ namespace Customer.Portal.Migrations
                     b.Navigation("SupportTickets");
 
                     b.Navigation("UserServicePlans");
-                });
-
-            modelBuilder.Entity("Customer.Portal.Entities.SupportTicket", b =>
-                {
-                    b.Navigation("TicketComments");
                 });
 
             modelBuilder.Entity("Volo.Abp.AuditLogging.AuditLog", b =>

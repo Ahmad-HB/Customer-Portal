@@ -14,7 +14,7 @@ public interface IEmailManager : IDomainService
         
         public Task SendTicketCreatedEmailtAsync(string adress, Guid ticketId, Guid identityUserId);
         
-        public Task SendTicketUpdatedEmailAsync(string adress, Guid ticketId, Guid identityUserId);
+        public Task SendTicketUpdatedEmailAsync(string adress, Guid ticketId, Guid identityUserId, UpdateType updateType, string? previousValue = null, string? newValue = null);
         
         public Task SendCustomerRegistrationEmailAsync(string adress, Guid identityUserId);
         

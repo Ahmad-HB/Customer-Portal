@@ -1,268 +1,230 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { User, Shield, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { RoleBasedAccess } from "@/components/RoleBasedAccess"
-import { useAuth } from "@/contexts/AuthContext"
-import { useCurrentUserRole } from "@/hooks/useAbpApi"
+import { useState, useEffect } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { User, Shield, Loader2 } from 'lucide-react'
 
-export default function SupportProfilePage() {
-  const { user, isLoading: authLoading } = useAuth()
-  const { role: currentRole, isLoading: roleLoading, isSupportAgent } = useCurrentUserRole()
-  
+export default function ProfilePage() {
+  const { user, updateUser } = useAuth()
+
   const [formData, setFormData] = useState({
-    username: "",
     name: "",
+    surname: "",
+    username: "",
     email: "",
     phone: "",
-    role: ""
+    role: "",
+    concurrencyStamp: "",
   })
-  const [isEditing, setIsEditing] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [message, setMessage] = useState("")
 
+  const [originalData, setOriginalData] = useState({
+    name: "",
+    surname: "",
+    username: "",
+    email: "",
+    phone: "",
+    role: "",
+    concurrencyStamp: "",
+  })
+
+  const [hasChanges, setHasChanges] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Initialize with real user data from backend
   useEffect(() => {
-    if (user && currentRole && !roleLoading) {
-      setFormData({
-        username: user.username || "",
+    if (user) {
+      const userData = {
         name: user.name || "",
+        surname: "", // Backend doesn't seem to have surname
+        username: user.username || "",
         email: user.email || "",
         phone: user.phone || "",
-        role: currentRole || ""
-      })
+        role: user.role || "",
+        concurrencyStamp: (user as any).concurrencyStamp || "",
+      }
+      setFormData(userData)
+      setOriginalData(userData)
     }
-  }, [user, currentRole, roleLoading])
+  }, [user])
+
+  // Check for changes whenever formData changes
+  useEffect(() => {
+    const changed = Object.keys(formData).some(key => 
+      formData[key as keyof typeof formData] !== originalData[key as keyof typeof originalData]
+    )
+    setHasChanges(changed)
+  }, [formData, originalData])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
+    // Don't allow changes to the role field
+    if (e.target.name === 'role') return
+    
+    setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     }))
   }
 
-  const handleSave = async () => {
-    setIsSaving(true)
-    setMessage("")
+  const handleEdit = async () => {
+    setIsLoading(true)
     
     try {
-      // TODO: Implement profile update API call
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API call
+      const success = await updateUser({
+        username: formData.username,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        surname: formData.surname,
+        concurrencyStamp: formData.concurrencyStamp
+      } as any)
       
-      setMessage("Profile updated successfully!")
-      setIsEditing(false)
-      
-      // Clear message after 3 seconds
-      setTimeout(() => setMessage(""), 3000)
-    } catch (error) {
-      setMessage("Failed to update profile. Please try again.")
+      if (success) {
+        // Refresh the page after successful update to ensure clean state
+        setTimeout(() => {
+          window.location.reload()
+        }, 1500)
+      }
+    } catch (err) {
+      console.error('Failed to update profile:', err)
     } finally {
-      setIsSaving(false)
+      setIsLoading(false)
     }
   }
 
   const handleCancel = () => {
-    // Reset form to original values
-    if (user && currentRole) {
-      setFormData({
-        username: user.username || "",
-        name: user.name || "",
-        email: user.email || "",
-        phone: user.phone || "",
-        role: currentRole || ""
-      })
-    }
-    setIsEditing(false)
-    setMessage("")
-  }
-
-  if (authLoading || roleLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading profile...</p>
-        </div>
-      </div>
-    )
+    console.log("Cancel changes")
+    setFormData(originalData)
+    setHasChanges(false)
   }
 
   return (
-    <RoleBasedAccess allowedRoles={[3]} fallback={<div>Access Denied</div>}>
-      <div className="p-8 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
-            <p className="text-muted-foreground">Manage your support agent profile and settings</p>
-          </div>
-          <Badge variant="outline" className="text-sm">
-            Support Agent
-          </Badge>
+    <div className="p-8">
+      <div className="grid gap-8 lg:grid-cols-2">
+        {/* Left side - Avatar */}
+        <div className="flex justify-center lg:justify-start">
+          <Card className="flex h-80 w-80 items-center justify-center bg-card">
+            <User className="h-20 w-20 text-muted-foreground" />
+          </Card>
         </div>
 
-        {/* Profile Card */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                <User className="w-8 h-8 text-blue-600" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">{formData.name || "Support Agent"}</h2>
-                <p className="text-muted-foreground">{formData.role || "Support Agent"}</p>
-              </div>
+        {/* Right side - Form */}
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input 
+                id="name" 
+                name="name" 
+                value={formData.name || ""} 
+                onChange={handleChange} 
+                className="rounded-full" 
+                placeholder="Enter your name"
+              />
             </div>
-
-            {/* Message */}
-            {message && (
-              <div className={`p-3 rounded-md mb-6 ${
-                message.includes("successfully") 
-                  ? "bg-green-50 text-green-700 border border-green-200" 
-                  : "bg-red-50 text-red-700 border border-red-200"
-              }`}>
-                {message}
-              </div>
-            )}
-
-            {/* Profile Form */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                  className="bg-gray-50"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                  className="bg-gray-50"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                  className="bg-gray-50"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                  className="bg-gray-50"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Input
-                  id="role"
-                  name="role"
-                  value={formData.role}
-                  disabled
-                  className="bg-gray-100 text-gray-500"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="surname">Surname</Label>
+              <Input
+                id="surname"
+                name="surname"
+                value={formData.surname || ""}
+                onChange={handleChange}
+                className="rounded-full"
+                placeholder="Enter your surname (optional)"
+              />
             </div>
+          </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-6 border-t border-gray-200">
-              {!isEditing ? (
-                <Button
-                  onClick={() => setIsEditing(true)}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  Edit Profile
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      "Save Changes"
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleCancel}
-                    disabled={isSaving}
-                  >
-                    Cancel
-                  </Button>
-                </>
-              )}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="username">User name</Label>
+              <Input
+                id="username"
+                name="username"
+                value={formData.username || ""}
+                onChange={handleChange}
+                className="rounded-full"
+                placeholder="Enter your username"
+              />
             </div>
-          </CardContent>
-        </Card>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email || ""}
+                onChange={handleChange}
+                className="rounded-full"
+                placeholder="Enter your email"
+              />
+            </div>
+          </div>
 
-        {/* Support Agent Information */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Shield className="w-5 h-5 text-blue-600" />
-              <h3 className="text-lg font-semibold text-gray-900">Support Agent Information</h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number</Label>
+              <Input
+                id="phone"
+                name="phone"
+                type="tel"
+                value={formData.phone || ""}
+                onChange={handleChange}
+                className="rounded-full"
+                placeholder="Enter your phone number"
+              />
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-              <div>
-                <h4 className="font-medium text-gray-700 mb-2">Permissions</h4>
-                <ul className="space-y-1 text-gray-600">
-                  <li>• View assigned tickets</li>
-                  <li>• Submit ticket reports</li>
-                  <li>• Assign ticket priorities</li>
-                  <li>• Access customer information</li>
-                </ul>
-              </div>
-              
-              <div>
-                <h4 className="font-medium text-gray-700 mb-2">Responsibilities</h4>
-                <ul className="space-y-1 text-gray-600">
-                  <li>• Monitor ticket status</li>
-                  <li>• Provide customer support</li>
-                  <li>• Escalate critical issues</li>
-                  <li>• Maintain ticket documentation</li>
-                </ul>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="role" className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Role
+              </Label>
+              <Input
+                id="role"
+                name="role"
+                value={formData.role || ""}
+                disabled
+                className="rounded-full bg-gray-100 cursor-not-allowed text-gray-700 font-medium"
+                placeholder="Your role will be displayed here"
+              />
+              <p className="text-xs text-muted-foreground">This field shows your current role and cannot be edited</p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+
+          {/* Action Buttons - Only show when there are changes, positioned under form fields */}
+          {hasChanges && (
+            <div className="flex gap-3 pt-2">
+              <Button
+                onClick={handleEdit}
+                disabled={isLoading}
+                size="sm"
+                className="rounded-full bg-green-500 hover:bg-green-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+              >
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </div>
+                ) : (
+                  'Save Changes'
+                )}
+              </Button>
+              <Button
+                onClick={handleCancel}
+                disabled={isLoading}
+                variant="destructive"
+                size="sm"
+                className="rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
-    </RoleBasedAccess>
+    </div>
   )
 }

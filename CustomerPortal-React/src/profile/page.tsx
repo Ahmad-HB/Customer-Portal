@@ -8,37 +8,57 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { User, EyeOff, Shield, Loader2 } from 'lucide-react'
-import { toast } from '@/hooks/use-toast'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { User, Shield, Loader2 } from 'lucide-react'
 import { useTickets } from "@/hooks/useTickets"
-import { useUserServicePlans } from "@/hooks/useUserServicePlans"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { apiClient } from '@/lib/api-client'
+import { getStatusColor, getPriorityColor, ColorScheme } from "@/lib/color-scheme"
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth()
   const { role: currentRole, isLoading: roleLoading, isAdmin } = useCurrentUserRole()
   const { tickets, loading: ticketsLoading } = useTickets()
-  const { 
-    userServicePlans, 
-    loading: plansLoading, 
-    suspendUserServicePlan, 
-    reactivateUserServicePlan 
-  } = useUserServicePlans()
 
-  // State for AppUser data from the backend
-  const [appUserData, setAppUserData] = useState<any>(null)
-  const [appUserLoading, setAppUserLoading] = useState(true)
+  // Filter tickets for completed activities (status 3 = Resolved, 4 = Closed)
+  const completedTickets = tickets.filter(ticket => ticket.status === 3 || ticket.status === 4)
+
+  // Helper functions for ticket display
+  const getStatusDisplay = (status: number) => {
+    switch (status) {
+      case 1: return { text: 'Open', color: getStatusColor(1) }
+      case 2: return { text: 'In Progress', color: getStatusColor(2) }
+      case 3: return { text: 'Resolved', color: getStatusColor(3) }
+      case 4: return { text: 'Closed', color: getStatusColor(4) }
+      default: return { text: 'Unknown', color: getStatusColor(0) }
+    }
+  }
+
+  const getPriorityDisplay = (priority: number, isAssigned: boolean) => {
+    if (!isAssigned) {
+      return { text: 'Not Priority Yet', color: getPriorityColor(0) }
+    }
+    
+    switch (priority) {
+      case 1: return { text: 'Low', color: getPriorityColor(1) }
+      case 2: return { text: 'Medium', color: getPriorityColor(2) }
+      case 3: return { text: 'High', color: getPriorityColor(3) }
+      default: return { text: 'Not Priority Yet', color: getPriorityColor(0) }
+    }
+  }
+
+  // State for profile data from APIs
+  const [profileData, setProfileData] = useState<any>(null)
+  const [profileLoading, setProfileLoading] = useState(true)
+  const [profileError, setProfileError] = useState<string | null>(null)
   
   // Temporary debugging
   useEffect(() => {
-    console.log('🔍 [Profile Debug] user.role from AuthContext:', user?.role)
+    console.log('🔍 [Profile Debug] Full user object from AuthContext:', user)
+    console.log('🔍 [Profile Debug] Profile data from API:', profileData)
     console.log('🔍 [Profile Debug] currentRole from useCurrentUserRole:', currentRole)
     console.log('🔍 [Profile Debug] isAdmin from useCurrentUserRole:', isAdmin)
     console.log('🔍 [Profile Debug] roleLoading:', roleLoading)
-  }, [user?.role, currentRole, isAdmin, roleLoading])
-  
+  }, [user, profileData, currentRole, isAdmin, roleLoading])
+
   const [formData, setFormData] = useState({
     name: "",
     surname: "",
@@ -46,6 +66,7 @@ export default function ProfilePage() {
     email: "",
     phone: "",
     role: "",
+    concurrencyStamp: "",
   })
 
   const [originalData, setOriginalData] = useState({
@@ -55,20 +76,25 @@ export default function ProfilePage() {
     email: "",
     phone: "",
     role: "",
+    concurrencyStamp: "",
   })
 
   const [hasChanges, setHasChanges] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  // Fetch user profile data directly from /api/account/my-profile
+  // Fetch profile data from the two APIs
   useEffect(() => {
-    const fetchUserProfileData = async () => {
+    const fetchProfileData = async () => {
       try {
-        setAppUserLoading(true)
-        const response = await fetch('https://localhost:44338/api/account/my-profile', {
+        setProfileLoading(true)
+        setProfileError(null)
+        
+        console.log('🔍 [Profile Debug] Fetching profile data from APIs...')
+        
+        // Fetch user profile data from /api/account/my-profile
+        const profileResponse = await fetch('https://localhost:44338/api/account/my-profile', {
           method: 'GET',
           headers: { 
             'Accept': 'application/json'
@@ -76,39 +102,62 @@ export default function ProfilePage() {
           credentials: 'include'
         })
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch profile: ${response.status}`)
+        if (!profileResponse.ok) {
+          throw new Error(`Failed to fetch profile: ${profileResponse.status}`)
         }
 
-        const data = await response.json()
-        setAppUserData(data)
-        console.log('🔍 [Profile Debug] User profile data from /api/account/my-profile:', data)
+        const profileData = await profileResponse.json()
+        console.log('🔍 [Profile Debug] Profile data from /api/account/my-profile:', profileData)
+        
+        // Fetch user role from /api/app/app-user/currnt-user-role
+        const roleResponse = await fetch('https://localhost:44338/api/app/app-user/currnt-user-role', {
+          method: 'GET',
+          headers: { 
+            'Accept': 'application/json'
+          },
+          credentials: 'include'
+        })
+
+        if (!roleResponse.ok) {
+          throw new Error(`Failed to fetch role: ${roleResponse.status}`)
+        }
+
+        const userRole = await roleResponse.text() // API returns string, not JSON
+        console.log('🔍 [Profile Debug] User role from /api/app/app-user/currnt-user-role:', userRole)
+        
+        // Combine the data
+        const combinedData = {
+          ...profileData,
+          role: userRole
+        }
+        
+        setProfileData(combinedData)
+        
+        // Initialize form data with the API data
+        const userData = {
+          name: profileData.name || "",
+          surname: profileData.surname || "",
+          username: profileData.userName || "",
+          email: profileData.email || "",
+          phone: profileData.phoneNumber || "",
+          role: userRole || "",
+          concurrencyStamp: profileData.concurrencyStamp || "",
+        }
+        
+        setFormData(userData)
+        setOriginalData(userData)
+        console.log('🔍 [Profile Debug] Form data initialized with API data:', userData)
+        
       } catch (error) {
-        console.error('Error fetching user profile data:', error)
+        console.error('Error fetching profile data:', error)
+        setProfileError(error instanceof Error ? error.message : 'Failed to fetch profile data')
       } finally {
-        setAppUserLoading(false)
+        setProfileLoading(false)
       }
     }
 
-    fetchUserProfileData()
+    fetchProfileData()
   }, [])
-
-  // Initialize with real user data from /api/account/my-profile
-  useEffect(() => {
-    if (appUserData && currentRole && !roleLoading) {
-      const userData = {
-        name: appUserData.name || "",           // ✅ Use name from /api/account/my-profile
-        surname: appUserData.surname || "",     // ✅ Use surname from /api/account/my-profile (can be null)
-        username: appUserData.userName || "",   // ✅ Use userName from /api/account/my-profile
-        email: appUserData.email || "",         // ✅ Use email from /api/account/my-profile
-        phone: appUserData.phoneNumber || "",   // ✅ Use phoneNumber from /api/account/my-profile
-        role: currentRole || "",
-      }
-      setFormData(userData)
-      setOriginalData(userData)
-      console.log('🔍 [Profile Debug] Form data initialized with /api/account/my-profile data:', userData)
-    }
-  }, [appUserData, currentRole, roleLoading])
 
   // Check for changes whenever formData changes
   useEffect(() => {
@@ -138,15 +187,17 @@ export default function ProfilePage() {
         username: formData.username,
         name: formData.name,
         email: formData.email,
-        phone: formData.phone
-      })
+        phone: formData.phone,
+        surname: formData.surname,
+        concurrencyStamp: formData.concurrencyStamp
+      } as any)
       
       if (success) {
-        setSuccess('Profile updated successfully!')
-        setOriginalData(formData)
-        setHasChanges(false)
-        // Clear success message after 3 seconds
-        setTimeout(() => setSuccess(null), 3000)
+        setSuccess('Profile updated successfully! Refreshing page...')
+        // Refresh the page after successful update to ensure clean state
+        setTimeout(() => {
+          window.location.reload()
+        }, 1500)
       } else {
         setError('Failed to update profile. Please try again.')
       }
@@ -165,40 +216,42 @@ export default function ProfilePage() {
     setSuccess(null)
   }
 
-  const handleSuspend = async (subscriptionId: string) => {
-    setActionLoading(subscriptionId)
-    setError(null)
-    setSuccess(null)
-    
-    try {
-      const success = await suspendUserServicePlan(subscriptionId)
-      if (success) {
-        setSuccess('Service plan suspended successfully!')
-        setTimeout(() => setSuccess(null), 3000)
-      }
-    } catch (err) {
-      setError('Failed to suspend service plan. Please try again.')
-    } finally {
-      setActionLoading(null)
-    }
+
+  // Show loading state if profile data is not available yet
+  if (profileLoading) {
+    return (
+      <div className="p-8 space-y-8">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading user profile...</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
-  const handleReactivate = async (subscriptionId: string) => {
-    setActionLoading(subscriptionId)
-    setError(null)
-    setSuccess(null)
-    
-    try {
-      const success = await reactivateUserServicePlan(subscriptionId)
-      if (success) {
-        setSuccess('Service plan reactivated successfully!')
-        setTimeout(() => setSuccess(null), 3000)
-      }
-    } catch (err) {
-      setError('Failed to reactivate service plan. Please try again.')
-    } finally {
-      setActionLoading(null)
-    }
+  // Show error state if profile data failed to load
+  if (profileError) {
+    return (
+      <div className="p-8 space-y-8">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="text-red-600 mb-4">
+              <Shield className="h-12 w-12 mx-auto" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Profile</h2>
+            <p className="text-gray-600 mb-4">{profileError}</p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              variant="outline"
+            >
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -209,11 +262,11 @@ export default function ProfilePage() {
           <h1 className="text-3xl font-bold">
             {window.location.pathname === '/admin/profile' ? 'Admin Profile' : 'Profile'}
           </h1>
-          {!roleLoading && currentRole && (
+          {!roleLoading && (formData.role || currentRole || user?.role) && (
             <div className="flex items-center gap-2 mt-2">
               <span className="text-sm text-muted-foreground">Role:</span>
               <Badge variant="secondary" className="capitalize">
-                {currentRole}
+                {formData.role || currentRole || user?.role}
               </Badge>
               {isAdmin && (
                 <Badge variant="destructive">Administrator</Badge>
@@ -228,15 +281,15 @@ export default function ProfilePage() {
 
       {/* Error Message */}
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-600 text-sm">{error}</p>
+        <div className={`mb-6 p-4 ${ColorScheme.alerts.error.bg} border ${ColorScheme.alerts.error.border} rounded-lg`}>
+          <p className={`${ColorScheme.alerts.error.text} text-sm`}>{error}</p>
         </div>
       )}
 
       {/* Success Message */}
       {success && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-green-600 text-sm">{success}</p>
+        <div className={`mb-6 p-4 ${ColorScheme.alerts.success.bg} border ${ColorScheme.alerts.success.border} rounded-lg`}>
+          <p className={`${ColorScheme.alerts.success.text} text-sm`}>{success}</p>
         </div>
       )}
 
@@ -255,7 +308,14 @@ export default function ProfilePage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
-              <Input id="name" name="name" value={formData.name} onChange={handleChange} className="rounded-full" />
+              <Input 
+                id="name" 
+                name="name" 
+                value={formData.name || ""} 
+                onChange={handleChange} 
+                className="rounded-full" 
+                placeholder="Enter your name"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="surname">Surname</Label>
@@ -265,7 +325,7 @@ export default function ProfilePage() {
                 value={formData.surname || ""}
                 onChange={handleChange}
                 className="rounded-full"
-                placeholder="No surname"
+                placeholder="Enter your surname (optional)"
               />
             </div>
           </div>
@@ -276,9 +336,10 @@ export default function ProfilePage() {
               <Input
                 id="username"
                 name="username"
-                value={formData.username}
+                value={formData.username || ""}
                 onChange={handleChange}
                 className="rounded-full"
+                placeholder="Enter your username"
               />
             </div>
             <div className="space-y-2">
@@ -287,9 +348,10 @@ export default function ProfilePage() {
                 id="email"
                 name="email"
                 type="email"
-                value={formData.email}
+                value={formData.email || ""}
                 onChange={handleChange}
                 className="rounded-full"
+                placeholder="Enter your email"
               />
             </div>
           </div>
@@ -301,9 +363,10 @@ export default function ProfilePage() {
                 id="phone"
                 name="phone"
                 type="tel"
-                value={formData.phone}
+                value={formData.phone || ""}
                 onChange={handleChange}
                 className="rounded-full"
+                placeholder="Enter your phone number"
               />
             </div>
             <div className="space-y-2">
@@ -314,7 +377,7 @@ export default function ProfilePage() {
               <Input
                 id="role"
                 name="role"
-                value={formData.role}
+                value={formData.role || ""}
                 disabled
                 className="rounded-full bg-gray-100 cursor-not-allowed text-gray-700 font-medium"
                 placeholder="Your role will be displayed here"
@@ -359,13 +422,13 @@ export default function ProfilePage() {
       <div className="mt-8">
         <h2 className="mb-4 text-lg font-semibold">Last Activity</h2>
 
-        <Tabs defaultValue="tickets" className="w-full">
+        <Tabs defaultValue="all-activities" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="tickets">Tickets</TabsTrigger>
-            <TabsTrigger value="service-plans">Service Plans</TabsTrigger>
+            <TabsTrigger value="all-activities">All Activities</TabsTrigger>
+            <TabsTrigger value="completed">Completed</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="tickets" className="mt-6">
+          <TabsContent value="all-activities" className="mt-6">
             {ticketsLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin mr-2" />
@@ -376,132 +439,134 @@ export default function ProfilePage() {
                 <p className="text-muted-foreground">No tickets found.</p>
               </div>
             ) : (
-              <div className="space-y-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
-                {tickets.map((ticket) => (
-                  <Card key={ticket.id}>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{ticket.name}</h3>
-                        </div>
-                        <div className="flex items-center gap-8">
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wide">STATUS</p>
-                            <Badge variant="secondary" className="mt-1 bg-yellow-100 text-yellow-800">
-                              {ticket.status}
-                            </Badge>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wide">PRIORITY</p>
-                            <Badge variant="outline" className="mt-1 border-blue-200 text-blue-600">
-                              {ticket.priority}
-                            </Badge>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wide">CREATED</p>
-                            <p className="mt-1 text-sm">{ticket.creationTime ? new Date(ticket.creationTime).toLocaleDateString() : 'N/A'}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="service-plans" className="mt-6">
-            {plansLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                <span className="text-muted-foreground">Loading subscriptions...</span>
-              </div>
-            ) : userServicePlans.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No subscriptions found.</p>
-              </div>
-            ) : (
               <div className="border border-gray-200 rounded-lg bg-gray-50">
-                <div className="max-h-96 overflow-y-auto p-4 space-y-4">
-                  {userServicePlans.map((subscription: any) => (
-                    <Card key={subscription.id}>
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <h3 className="font-medium">{subscription.servicePlanName}</h3>
-                          </div>
-                          <div className="flex items-center gap-6">
-                            <div className="text-center">
-                              <p className="text-xs text-muted-foreground uppercase tracking-wide">STATUS</p>
-                              <Badge className={`mt-1 ${
-                                subscription.isActive && !subscription.isSuspended 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {subscription.isActive && !subscription.isSuspended ? 'Active' : 'Inactive'}
-                              </Badge>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-xs text-muted-foreground uppercase tracking-wide">START DATE</p>
-                              <p className="mt-1 text-sm">{new Date(subscription.startDate).toLocaleDateString()}</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-xs text-muted-foreground uppercase tracking-wide">END DATE</p>
-                              <p className="mt-1 text-sm font-medium text-blue-600">
-                                {new Date(subscription.endDate).toLocaleDateString()}
+                <div className="h-[calc(100vh-300px)] overflow-y-auto p-4 space-y-4">
+                  {tickets.map((ticket) => {
+                    const statusDisplay = getStatusDisplay(ticket.status)
+                    const isAssigned = !!(ticket.supportagentName || ticket.technicianId)
+                    const priorityDisplay = getPriorityDisplay(ticket.priority, isAssigned)
+                    
+                    return (
+                      <Card key={ticket.id}>
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h3 className="font-medium">{ticket.subject}</h3>
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                {ticket.description}
                               </p>
                             </div>
-                            <div className="flex gap-2">
-                              {subscription.isActive && !subscription.isSuspended ? (
-                                <Button 
-                                  variant="destructive" 
-                                  size="sm" 
-                                  className="rounded-full"
-                                  onClick={() => handleSuspend(subscription.id)}
-                                  disabled={actionLoading === subscription.id}
-                                >
-                                  {actionLoading === subscription.id ? (
-                                    <div className="flex items-center gap-2">
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                      Suspending...
-                                    </div>
-                                  ) : (
-                                    'Suspend'
-                                  )}
-                                </Button>
-                              ) : (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="rounded-full bg-green-500 text-white hover:bg-green-600"
-                                  onClick={() => handleReactivate(subscription.id)}
-                                  disabled={actionLoading === subscription.id}
-                                >
-                                  {actionLoading === subscription.id ? (
-                                    <div className="flex items-center gap-2">
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                      Reactivating...
-                                    </div>
-                                  ) : (
-                                    'Reactivate'
-                                  )}
-                                </Button>
-                              )}
-                              <Button variant="outline" size="sm" className="rounded-full bg-transparent">
-                                Change Plan
-                              </Button>
+                            <div className="flex items-center gap-8">
+                              <div className="text-center">
+                                <p className="text-xs text-blue-600 font-semibold uppercase tracking-wide">STATUS</p>
+                                <Badge className={`${statusDisplay.color} text-xs mt-1`}>
+                                  {statusDisplay.text}
+                                </Badge>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-xs text-orange-600 font-semibold uppercase tracking-wide">PRIORITY</p>
+                                <Badge className={`${priorityDisplay.color} text-xs mt-1`}>
+                                  {priorityDisplay.text}
+                                </Badge>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-xs text-green-600 font-semibold uppercase tracking-wide">SUPPORT AGENT</p>
+                                <p className="mt-1 text-sm text-green-700 font-medium">
+                                  {ticket.supportagentName || 'Not assigned'}
+                                </p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-xs text-purple-600 font-semibold uppercase tracking-wide">TECHNICIAN</p>
+                                <p className="mt-1 text-sm text-purple-700 font-medium">
+                                  {ticket.technicianName || 'Not assigned'}
+                                </p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">CREATED</p>
+                                <p className="mt-1 text-sm text-gray-700 font-medium">{new Date(ticket.createdAt).toLocaleDateString()}</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
                 </div>
               </div>
             )}
           </TabsContent>
+
+          <TabsContent value="completed" className="mt-6">
+            {ticketsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                <span className="text-muted-foreground">Loading completed activities...</span>
+              </div>
+            ) : completedTickets.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No completed activities found.</p>
+              </div>
+            ) : (
+              <div className="border border-gray-200 rounded-lg bg-gray-50">
+                <div className="h-[calc(100vh-300px)] overflow-y-auto p-4 space-y-4">
+                  {completedTickets.map((ticket) => {
+                    const statusDisplay = getStatusDisplay(ticket.status)
+                    const isAssigned = !!(ticket.supportagentName || ticket.technicianId)
+                    const priorityDisplay = getPriorityDisplay(ticket.priority, isAssigned)
+                    
+                    return (
+                      <Card key={ticket.id}>
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h3 className="font-medium">{ticket.subject}</h3>
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                {ticket.description}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-8">
+                              <div className="text-center">
+                                <p className="text-xs text-blue-600 font-semibold uppercase tracking-wide">STATUS</p>
+                                <Badge className={`${statusDisplay.color} text-xs mt-1`}>
+                                  {statusDisplay.text}
+                                </Badge>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-xs text-orange-600 font-semibold uppercase tracking-wide">PRIORITY</p>
+                                <Badge className={`${priorityDisplay.color} text-xs mt-1`}>
+                                  {priorityDisplay.text}
+                                </Badge>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-xs text-green-600 font-semibold uppercase tracking-wide">SUPPORT AGENT</p>
+                                <p className="mt-1 text-sm text-green-700 font-medium">
+                                  {ticket.supportagentName || 'Not assigned'}
+                                </p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-xs text-purple-600 font-semibold uppercase tracking-wide">TECHNICIAN</p>
+                                <p className="mt-1 text-sm text-purple-700 font-medium">
+                                  {ticket.technicianName || 'Not assigned'}
+                                </p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">CREATED</p>
+                                <p className="mt-1 text-sm text-gray-700 font-medium">{new Date(ticket.createdAt).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
         </Tabs>
       </div>
+
     </div>
   )
 }

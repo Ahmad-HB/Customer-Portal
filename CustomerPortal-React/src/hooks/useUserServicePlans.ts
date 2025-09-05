@@ -55,9 +55,9 @@ export function useUserServicePlans(): UseUserServicePlansReturn {
     await fetchUserServicePlans()
   }
 
-  const suspendUserServicePlan = async (id: string): Promise<boolean> => {
+  const suspendUserServicePlan = async (id: string, suspensionReason: string = "Suspended by admin"): Promise<boolean> => {
     try {
-      const response = await apiClient.suspendUserServicePlan(id)
+      const response = await apiClient.suspendUserServicePlan(id, suspensionReason)
       if (response.success) {
         // Refresh the list to show updated status
         await refreshUserServicePlans()

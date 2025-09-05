@@ -21,6 +21,11 @@ public interface IAppUserManager : IDomainService
     
     public Task GetCurrentUserRoleAsync(Guid identityUserId);
     
+    public Task<List<AppUser>> GetSupportAgentsAsync();
     
+    public Task<List<AppUser>> GetTechniciansAsync();
     
+    public Task FixMissingIdentityUserIdsAsync();
+    
+    public Task SyncAppUserWithIdentityUserAsync(IdentityUser identityUser);
 }

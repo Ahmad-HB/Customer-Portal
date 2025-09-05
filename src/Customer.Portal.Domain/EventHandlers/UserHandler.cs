@@ -21,7 +21,8 @@ namespace Customer.Portal.EventHandlers;
 
 public class UserHandler : ILocalEventHandler<EntityCreatedEventData<IdentityUser>>,
     ITransientDependency,
-    ILocalEventHandler<EntityCreatedEventData<AppUser>>
+    ILocalEventHandler<EntityCreatedEventData<AppUser>>,
+    ILocalEventHandler<EntityUpdatedEventData<IdentityUser>>
 {
 
     #region Fields
@@ -113,12 +114,26 @@ public class UserHandler : ILocalEventHandler<EntityCreatedEventData<IdentityUse
         {
             
             await _emailManager.SendCustomerRegistrationEmailAsync(identityUser.Email, identityUser.Id);
-            _logger.LogInformation("Customer registration email process completed for user {UserId}", identityUser.Id);
         }
-        else
+    }
+    
+    public async Task HandleEventAsync(EntityUpdatedEventData<IdentityUser> eventData)
+    {
+        try
         {
-            _logger.LogWarning("Customer registration email template not found. Skipping email for user {UserId}", identityUser.Id);
+            var identityUser = eventData.Entity;
+            
+            _logger.LogInformation("IdentityUser updated event received for user {UserId} ({UserEmail})", 
+                identityUser.Id, identityUser.Email);
+            
+            // Sync the AppUser with the updated IdentityUser
+            await _appUserManager.Value.SyncAppUserWithIdentityUserAsync(identityUser);
+            
+            _logger.LogInformation("Successfully synced AppUser with IdentityUser {UserId}", identityUser.Id);
         }
-        
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error syncing AppUser with IdentityUser {UserId}", eventData.Entity.Id);
+        }
     }
 }

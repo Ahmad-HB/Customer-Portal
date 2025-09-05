@@ -7,6 +7,7 @@ using Customer.Portal.Entities;
 using Customer.Portal.Enums;
 using Microsoft.Extensions.Logging;
 using PuppeteerSharp;
+using PuppeteerSharp.Media;
 using Scriban;
 using Volo.Abp;
 using Volo.Abp.Domain.Repositories;
@@ -75,34 +76,65 @@ public class ReportManager : DomainService, IReportManager
             throw new UserFriendlyException($"No report template found for report type: {reportType}");
         }
         
+        // Get the specific ticket
         var supportTicket = await _supportTicketRepository.FirstOrDefaultAsync(st => st.Id == ticketId);
         if (supportTicket == null)
         {
             throw new UserFriendlyException($"No support ticket found with ID: {ticketId}");
         }
         
+        // Get the support agent info (current logged in user)
         var supportAgent = await _appUserRepository.FirstOrDefaultAsync(au => au.IdentityUserId == identityUserId);
+        if (supportAgent == null)
+        {
+            throw new UserFriendlyException("Support agent not found");
+        }
         
+        // Get customer info
         var customer = await _appUserRepository.FirstOrDefaultAsync(au => au.Id == supportTicket.AppUserId);
         
-        var technician = await _identityUserRepository.FirstOrDefaultAsync(au => au.Id == supportTicket.TechnicianId);
+        // Get technician info (if assigned)
+        var technician = await _appUserRepository.FirstOrDefaultAsync(au => au.Id == supportTicket.TechnicianId);
         
         
-        var templateData = new
+        var templateData = new Dictionary<string, object>
         {
-            CustomerName = customer?.Name ?? "N/A",
-            SupportAgentName = supportAgent?.Name ?? "N/A",
-            TicketId = supportTicket.Id,
-            IssueDescription = supportTicket.Description,
-            Status = supportTicket.Status.ToString(),
-            CreatedAt = supportTicket.CreatedAt.ToString("yyyy-MM-dd"),
-            ResolvedAt = supportTicket.ResolvedAt?.ToString("yyyy-MM-dd"),
-            date = new { now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") }
+            ["CustomerName"] = customer?.Name ?? "N/A",
+            ["SupportAgentName"] = supportAgent?.Name ?? "N/A",
+            ["TechnicianName"] = technician?.Name ?? "N/A",
+            ["TicketId"] = supportTicket.Id,
+            ["TicketSubject"] = supportTicket.Subject,
+            ["IssueDescription"] = supportTicket.Description,
+            ["Status"] = supportTicket.Status.ToString(),
+            ["Priority"] = supportTicket.Priority.ToString(),
+            ["CreatedAt"] = supportTicket.CreatedAt.ToString("yyyy-MM-dd"),
+            ["ResolvedAt"] = supportTicket.ResolvedAt?.ToString("yyyy-MM-dd"),
+            ["date"] = new Dictionary<string, object>
+            {
+                ["now"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+            }
         };
         
+        // Log template data for debugging
+        _logger.LogInformation("Template data: SupportAgentName={SupportAgentName}, TicketId={TicketId}, CustomerName={CustomerName}",
+            templateData["SupportAgentName"], templateData["TicketId"], templateData["CustomerName"]);
+
         // Use Scriban to render the template from database
         var template = Template.Parse(reportTemplate.Format);
+        if (template.HasErrors)
+        {
+            _logger.LogError("Template parsing errors: {Errors}",
+                string.Join(", ", template.Messages.Select(m => m.Message)));
+            throw new UserFriendlyException("Report template has parsing errors");
+        }
+
         var reportContent = template.Render(templateData);
+        
+        if (string.IsNullOrEmpty(reportContent))
+        {
+            _logger.LogError("Rendered report content is empty");
+            throw new UserFriendlyException("Report template rendering resulted in empty content");
+        }
         
         
         var report = new Report(
@@ -127,34 +159,67 @@ public class ReportManager : DomainService, IReportManager
             throw new UserFriendlyException($"No report template found for report type: {reportType}");
         }
         
+        // Get the specific ticket
         var supportTicket = await _supportTicketRepository.FirstOrDefaultAsync(st => st.Id == ticketId);
         if (supportTicket == null)
         {
             throw new UserFriendlyException($"No support ticket found with ID: {ticketId}");
         }
         
+        // Get the support agent info (current logged in user)
         var supportAgent = await _appUserRepository.FirstOrDefaultAsync(au => au.IdentityUserId == identityUserId);
+        if (supportAgent == null)
+        {
+            throw new UserFriendlyException("Support agent not found");
+        }
         
+        // Get customer info
         var customer = await _appUserRepository.FirstOrDefaultAsync(au => au.Id == supportTicket.AppUserId);
         
-        var technician = await _identityUserRepository.FirstOrDefaultAsync(au => au.Id == supportTicket.TechnicianId);
+        // Get technician info (if assigned)
+        var technicianId = supportTicket.TechnicianId;
+        var technician = await _identityUserRepository.FirstOrDefaultAsync(au => au.Id == technicianId);
+            
+            
         
-        var templateData = new
+        var templateData = new Dictionary<string, object>
         {
-            CustomerName = customer?.Name ?? "N/A",
-            SupportAgentName = supportAgent?.Name ?? "N/A",
-            TechnicianName = technician?.UserName ?? "N/A",
-            TicketId = supportTicket.Id,
-            IssueDescription = supportTicket.Description,
-            Status = supportTicket.Status.ToString(),
-            CreatedAt = supportTicket.CreatedAt.ToString("yyyy-MM-dd"),
-            ResolvedAt = supportTicket.ResolvedAt?.ToString("yyyy-MM-dd"),
-            date = new { now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") }
+            ["CustomerName"] = customer?.Name ?? "N/A",
+            ["SupportAgentName"] = supportAgent?.Name ?? "N/A",
+            ["TechnicianName"] = technician?.Name ?? "N/A",
+            ["TicketId"] = supportTicket.Id,
+            ["TicketSubject"] = supportTicket.Subject,
+            ["IssueDescription"] = supportTicket.Description,
+            ["Status"] = supportTicket.Status.ToString(),
+            ["Priority"] = supportTicket.Priority.ToString(),
+            ["CreatedAt"] = supportTicket.CreatedAt.ToString("yyyy-MM-dd"),
+            ["ResolvedAt"] = supportTicket.ResolvedAt?.ToString("yyyy-MM-dd"),
+            ["date"] = new Dictionary<string, object>
+            {
+                ["now"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+            }
         };
         
+        // Log template data for debugging
+        _logger.LogInformation("Template data: SupportAgentName={SupportAgentName}, TechnicianName={TechnicianName}, TicketId={TicketId}, CustomerName={CustomerName}",
+            templateData["SupportAgentName"], templateData["TechnicianName"], templateData["TicketId"], templateData["CustomerName"]);
+
         // Use Scriban to render the template from database
         var template = Template.Parse(reportTemplate.Format);
+        if (template.HasErrors)
+        {
+            _logger.LogError("Template parsing errors: {Errors}",
+                string.Join(", ", template.Messages.Select(m => m.Message)));
+            throw new UserFriendlyException("Report template has parsing errors");
+        }
+
         var reportContent = template.Render(templateData);
+        
+        if (string.IsNullOrEmpty(reportContent))
+        {
+            _logger.LogError("Rendered report content is empty");
+            throw new UserFriendlyException("Report template rendering resulted in empty content");
+        }
         
         var report = new Report(
             _guidGenerator.Create(),
@@ -169,7 +234,7 @@ public class ReportManager : DomainService, IReportManager
         return pdf;
     }
 
-    public async Task<Byte[]> GenerateTechnicianReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId)
+    public async Task<Byte[]> GenerateTechnicianReportAsync(ReportTypes reportType, Guid ticketId, Guid identityUserId, string workPerformed)
     {
         var reportTemplate = await _reportTemplateRepository.FirstOrDefaultAsync(rt => rt.ReportType == reportType);
         if (reportTemplate == null)
@@ -187,17 +252,27 @@ public class ReportManager : DomainService, IReportManager
         
         var customer = await _appUserRepository.FirstOrDefaultAsync(au => au.Id == supportTicket.AppUserId);
         
-        var templateData = new
+        var templateData = new Dictionary<string, object>
         {
-            CustomerName = customer?.Name ?? "N/A",
-            TechnicianName = technician?.Name ?? "N/A",
-            TicketId = supportTicket.Id,
-            IssueDescription = supportTicket.Description,
-            Status = supportTicket.Status.ToString(),
-            CreatedAt = supportTicket.CreatedAt.ToString("yyyy-MM-dd"),
-            ResolvedAt = supportTicket.ResolvedAt?.ToString("yyyy-MM-dd"),
-            date = new { now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") }
+            ["CustomerName"] = customer?.Name ?? "N/A",
+            ["TechnicianName"] = technician?.Name ?? "N/A",
+            ["TicketId"] = supportTicket.Id,
+            ["TicketSubject"] = supportTicket.Subject,
+            ["IssueDescription"] = supportTicket.Description,
+            ["WorkPerformed"] = workPerformed ?? "No work performed details provided",
+            ["Status"] = supportTicket.Status.ToString(),
+            ["Priority"] = supportTicket.Priority?.ToString() ?? "Not Set",
+            ["CreatedAt"] = supportTicket.CreatedAt.ToString("yyyy-MM-dd"),
+            ["ResolvedAt"] = supportTicket.ResolvedAt?.ToString("yyyy-MM-dd"),
+            ["date"] = new Dictionary<string, object>
+            {
+                ["now"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+            }
         };
+        
+        // Log template data for debugging
+        _logger.LogInformation("Technician report template data: TechnicianName={TechnicianName}, TicketId={TicketId}, CustomerName={CustomerName}, WorkPerformed={WorkPerformed}",
+            templateData["TechnicianName"], templateData["TicketId"], templateData["CustomerName"], templateData["WorkPerformed"]);
         
         // Use Scriban to render the template from database
         var template = Template.Parse(reportTemplate.Format);
@@ -218,7 +293,7 @@ public class ReportManager : DomainService, IReportManager
 
     }
 
-    public async Task<Byte[]> GenerateMonthlySummaryReportAsync(ReportTypes reportType, DateTime startDate, DateTime endDate)
+    public async Task<Byte[]> GenerateSummaryReportAsync(ReportTypes reportType, DateTime startDate, DateTime endDate)
     {
         var reportTemplate = await _reportTemplateRepository.FirstOrDefaultAsync(rt => rt.ReportType == reportType);
         if (reportTemplate == null)
@@ -231,15 +306,18 @@ public class ReportManager : DomainService, IReportManager
         var inProgressTickets = totalTickets.Count(st => st.Status == TicketStatus.InProgress);
         var closedTickets = totalTickets.Count(st => st.Status == TicketStatus.Closed);
         
-        var templateData = new
+        var templateData = new Dictionary<string, object>
         {
-            start_date = startDate.ToString("yyyy-MM-dd"),
-            end_date = endDate.ToString("yyyy-MM-dd"),
-            total_tickets = totalTickets.Count,
-            resolved_tickets = resolvedTickets,
-            in_progress_tickets = inProgressTickets,
-            closed_tickets = closedTickets,
-            date = new { now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") }
+            ["start_date"] = startDate.ToString("yyyy-MM-dd"),
+            ["end_date"] = endDate.ToString("yyyy-MM-dd"),
+            ["total_tickets"] = totalTickets.Count,
+            ["resolved_tickets"] = resolvedTickets,
+            ["in_progress_tickets"] = inProgressTickets,
+            ["closed_tickets"] = closedTickets,
+            ["date"] = new Dictionary<string, object>
+            {
+                ["now"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+            }
         };
         
         // Use Scriban to render the template from database
@@ -303,15 +381,39 @@ public class ReportManager : DomainService, IReportManager
             
             using var page = await browser.NewPageAsync();
             
+            // Set viewport for consistent rendering
+            await page.SetViewportAsync(new ViewPortOptions
+            {
+                Width = 1200,
+                Height = 800,
+                DeviceScaleFactor = 2
+            });
+            
             // Set the HTML content
-            await page.SetContentAsync(report.Content);
+            await page.SetContentAsync(report.Content, new NavigationOptions
+            {
+                WaitUntil = new[] { WaitUntilNavigation.Networkidle0 }
+            });
             
-            // Wait for any dynamic content to load
-            await Task.Delay(1000);
+            // Wait for any dynamic content to load and fonts to render
+            await Task.Delay(2000);
             
-            // Generate PDF to temporary file
+            // Generate PDF to temporary file with optimized settings
             var tempPdfPath = Path.GetTempFileName() + ".pdf";
-            await page.PdfAsync(tempPdfPath);
+            await page.PdfAsync(tempPdfPath, new PdfOptions
+            {
+                Format = PuppeteerSharp.Media.PaperFormat.A4,
+                PrintBackground = true,
+                MarginOptions = new PuppeteerSharp.Media.MarginOptions
+                {
+                    Top = "0.5in",
+                    Right = "0.5in",
+                    Bottom = "0.5in",
+                    Left = "0.5in"
+                },
+                PreferCSSPageSize = true,
+                DisplayHeaderFooter = false
+            });
             var pdfBytes = await File.ReadAllBytesAsync(tempPdfPath);
             File.Delete(tempPdfPath);
             
@@ -324,7 +426,69 @@ public class ReportManager : DomainService, IReportManager
             return await GeneratePdfFromTextAsync(report);
         }
     }
-
+    
+    // private async Task<byte[]> GeneratePdfFromHtmlAsync(Report report)
+    // {
+    //     try
+    //     {
+    //         // Use PuppeteerSharp to convert HTML to PDF
+    //         await new BrowserFetcher().DownloadAsync();
+    //     
+    //         using var browser = await Puppeteer.LaunchAsync(new LaunchOptions
+    //         {
+    //             Headless = true,
+    //             Args = new[] { "--no-sandbox", "--disable-setuid-sandbox" }
+    //         });
+    //     
+    //         using var page = await browser.NewPageAsync();
+    //     
+    //         // Set viewport for consistent rendering
+    //         await page.SetViewportAsync(new ViewPortOptions
+    //         {
+    //             Width = 1200,
+    //             Height = 800,
+    //             DeviceScaleFactor = 2
+    //         });
+    //     
+    //         // Set the HTML content
+    //         await page.SetContentAsync(report.Content, new NavigationOptions
+    //         {
+    //             WaitUntil = new[] { WaitUntilNavigation.Networkidle0 }
+    //         });
+    //     
+    //         // Wait for charts to render (add additional wait time for JavaScript execution)
+    //         // await page.wait(3000);
+    //         await Task.Delay(2000); // Wait for any dynamic content to load and fonts to render
+    //         
+    //         // Generate PDF to temporary file with optimized settings
+    //         var tempPdfPath = Path.GetTempFileName() + ".pdf";
+    //         await page.PdfAsync(tempPdfPath, new PdfOptions
+    //         {
+    //             Format = PaperFormat.A4,
+    //             PrintBackground = true,
+    //             MarginOptions = new MarginOptions
+    //             {
+    //                 Top = "0.5in",
+    //                 Right = "0.5in",
+    //                 Bottom = "0.5in",
+    //                 Left = "0.5in"
+    //             },
+    //             PreferCSSPageSize = true,
+    //             DisplayHeaderFooter = false
+    //         });
+    //     
+    //         var pdfBytes = await File.ReadAllBytesAsync(tempPdfPath);
+    //         File.Delete(tempPdfPath);
+    //     
+    //         return pdfBytes;
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         _logger.LogError(ex, "Error generating PDF from HTML for report ID: {ReportId}", report.Id);
+    //         // Fallback to text rendering if HTML fails
+    //         return await GeneratePdfFromTextAsync(report);
+    //     }
+    // }
     private async Task<byte[]> GeneratePdfFromTextAsync(Report report)
     {
         try

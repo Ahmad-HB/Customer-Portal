@@ -15,7 +15,6 @@ import { useCurrentUserRole } from "@/hooks/useAbpApi"
 // Navigation items for each role - only show what each role should access
 const navigationByRole = {
   customer: [
-    { name: "Dashboard", href: "/customer/dashboard", icon: Home },
     { name: "Tickets", href: "/tickets", icon: Ticket },
     { name: "Plans", href: "/plans", icon: Package },
   ],

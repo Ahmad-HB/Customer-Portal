@@ -1,53 +1,63 @@
 import type { ReactNode } from 'react'
-import { useCurrentAppUser } from '@/hooks/useAbpApi'
-import { Shield } from 'lucide-react'
+import { Shield, LogIn } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext' // Added import for useAuth
 import { useCurrentUserRole } from '@/hooks/useAbpApi' // Added import for useCurrentUserRole
 
-// Beautiful Access Denied Component
+// Beautiful Login Required Component for unauthenticated users
+function LoginRequired() {
+  const navigate = useNavigate()
+  
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center">
+        <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-6">
+          <LogIn className="w-8 h-8 text-blue-600" />
+        </div>
+        
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Login Required</h1>
+        <p className="text-gray-600 mb-6">
+          You need to be logged in to access this page. Please sign in to continue.
+        </p>
+        
+        <div className="space-y-3">
+          <Button 
+            onClick={() => navigate('/login')} 
+            className="w-full bg-blue-600 hover:bg-blue-700"
+          >
+            Go to Login
+          </Button>
+          
+          <Button 
+            onClick={() => navigate('/signup')} 
+            variant="outline"
+            className="w-full"
+          >
+            Create Account
+          </Button>
+        </div>
+        
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <p className="text-sm text-gray-500">
+            Don't have an account? Sign up to get started.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Beautiful Access Denied Component for authenticated users without permission
 function AccessDenied({ userRole }: { userRole?: string }) {
   const navigate = useNavigate()
   const { logout } = useAuth()
-  const { role: currentRole, userType: currentUserType } = useCurrentUserRole()
   
   const handleLogout = async () => {
     await logout()
     navigate('/login')
   }
 
-  // Determine the correct dashboard URL based on user role
-  const getDashboardUrl = () => {
-    if (currentUserType) {
-      switch (currentUserType) {
-        case 1: return '/admin/dashboard'      // Admin
-        case 2: return '/customer/dashboard'   // Customer
-        case 3: return '/profile/assigned-tickets'              // Support Agent (no dashboard)
-        case 4: return '/profile/assigned-tickets'              // Technician (no dashboard)
-        default: return '/profile'
-      }
-    } else if (currentRole) {
-      switch (currentRole.toLowerCase()) {
-        case 'admin': return '/admin/dashboard'
-        case 'customer': return '/customer/dashboard'
-        case 'supportagent': return '/profile'
-        case 'technician': return '/profile'
-        default: return '/profile'
-      }
-    }
-    return '/profile' // Fallback
-  }
-
-  // Check if user has a dashboard
-  const hasDashboard = () => {
-    if (currentUserType) {
-      return currentUserType === 1 || currentUserType === 2 // Admin or Customer
-    } else if (currentRole) {
-      return currentRole.toLowerCase() === 'admin' || currentRole.toLowerCase() === 'customer'
-    }
-    return false
-  }
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
@@ -62,6 +72,9 @@ function AccessDenied({ userRole }: { userRole?: string }) {
             ? `You don't have permission to access this page. You are logged in as a ${userRole}.`
             : "You don't have permission to access this page."
           }
+        </p>
+        <p className="text-sm text-gray-500 mb-6">
+          This page is restricted to specific user roles. Please contact your administrator if you believe you should have access.
         </p>
         
         <div className="space-y-3">
@@ -80,6 +93,15 @@ function AccessDenied({ userRole }: { userRole?: string }) {
             className="w-full"
           >
             Go to Profile
+          </Button>
+          
+          {/* Logout button for users who might be in wrong account */}
+          <Button 
+            onClick={handleLogout} 
+            variant="destructive"
+            className="w-full"
+          >
+            Logout & Sign In Again
           </Button>
         </div>
         
@@ -118,7 +140,7 @@ interface RoleBasedAccessProps {
 export function RoleBasedAccess({ 
   children, 
   allowedRoles, 
-  fallback = <AccessDenied />,
+  fallback,
   loadingFallback = <LoadingFallback />
 }: RoleBasedAccessProps) {
   const { role: currentRole, isLoading: roleLoading, userType: currentUserType } = useCurrentUserRole()
@@ -140,9 +162,10 @@ export function RoleBasedAccess({
     return <>{loadingFallback}</>
   }
 
-  // If user is not authenticated at all, show fallback
+  // If user is not authenticated at all, show login required page
   if (!isAuthenticated) {
-    return <>{fallback}</>
+    console.log('🔒 [RoleBasedAccess] User not authenticated, showing login required')
+    return <LoginRequired />
   }
 
   // CRITICAL: Check if user has the required role
@@ -222,7 +245,7 @@ export function RoleBasedAccess({
     }
     
     console.log('🔒 [RoleBasedAccess] Access DENIED for user role:', roleName)
-    return <AccessDenied userRole={roleName} />
+    return fallback || <AccessDenied userRole={roleName} />
   }
 
   console.log('🔒 [RoleBasedAccess] Access GRANTED for user')

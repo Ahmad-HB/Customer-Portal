@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket Created - {{ CompanyName }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #28a745;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #28a745;
+            margin: 0;
+            font-size: 28px;
+        }
+        .success-badge {
+            display: inline-block;
+            background-color: #28a745;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .ticket-info {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .info-value {
+            color: #212529;
+        }
+        .welcome-section {
+            background-color: #e8f5e8;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #28a745;
+        }
+        .next-steps {
+            background-color: #fff4e6;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #ff6b35;
+        }
+        .contact-info {
+            background-color: #f0f8ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #28a745;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .btn:hover {
+            background-color: #218838;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .priority-high { color: #dc3545; font-weight: bold; }
+        .priority-medium { color: #ffc107; font-weight: bold; }
+        .priority-low { color: #28a745; font-weight: bold; }
+        .status-open { color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎫 Ticket Created</h1>
+            <div class="success-badge">Successfully Created</div>
+        </div>
+
+        <p>Hello <strong>{{ UserName }}</strong>,</p>
+        
+        <p>Thank you for contacting us! Your support ticket has been successfully created and we're here to help.</p>
+
+        <div class="welcome-section">
+            <h3>🎉 Welcome to Our Support System</h3>
+            <p>We've received your request and our team will review it shortly. You can track the progress of your ticket using the information below.</p>
+        </div>
+
+        <div class="ticket-info">
+            <h3>📋 Your Ticket Details</h3>
+            <div class="info-row">
+                <span class="info-label">Ticket ID:</span>
+                <span class="info-value"><strong>{{ TicketId }}</strong></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Title:</span>
+                <span class="info-value">{{ TicketName }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Description:</span>
+                <span class="info-value">{{ TicketDescription }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Priority:</span>
+                <span class="info-value priority-{{ Priority | string.downcase }}">{{ Priority }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Status:</span>
+                <span class="info-value status-{{ Status | string.downcase }}">{{ Status }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Created:</span>
+                <span class="info-value">{{ CreatedDate }} at {{ CreatedTime }}</span>
+            </div>
+        </div>
+
+        <div class="next-steps">
+            <h3>📝 What Happens Next?</h3>
+            <ul>
+                <li><strong>Immediate:</strong> Your ticket has been logged in our system</li>
+                <li><strong>Within 1 hour:</strong> A support agent will be assigned to your ticket</li>
+                <li><strong>Within 4 hours:</strong> You'll receive an initial response from our team</li>
+                <li><strong>Ongoing:</strong> We'll keep you updated on progress via email</li>
+            </ul>
+            <p><strong>Estimated Resolution Time:</strong> {{ EstimatedResolutionTime }}</p>
+        </div>
+
+        <div class="contact-info">
+            <h3>📞 Need Immediate Help?</h3>
+            <p>If this is an urgent issue, please don't hesitate to contact us directly:</p>
+            <p>
+                <strong>Support Email:</strong> {{ SupportEmail }}<br>
+                <strong>Support Phone:</strong> {{ SupportPhone }}<br>
+                <strong>Emergency Hotline:</strong> {{ EmergencyPhone }}
+            </p>
+            <p><em>Please reference your Ticket ID: <strong>{{ TicketId }}</strong></em></p>
+        </div>
+
+        <div style="text-align: center;">
+            <a href="{{ ActionUrl }}" class="btn">View Your Ticket</a>
+        </div>
+
+        <div class="footer">
+            <p>This email was sent by {{ CompanyName }} Support System</p>
+            <p>We're committed to providing you with excellent support. Thank you for choosing us!</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -16,6 +16,10 @@ interface TicketDetailsModalProps {
     status: string
     priority: string
     resolved?: string
+    supportAgent?: string
+    supportAgentEmail?: string
+    technician?: string
+    technicianEmail?: string
   } | null
 }
 
@@ -48,7 +52,7 @@ export function TicketDetailsModal({ isOpen, onClose, ticket }: TicketDetailsMod
 
           <div>
             <h3 className="text-sm font-medium text-foreground mb-2">Service Plan</h3>
-            <p className="text-sm text-muted-foreground">{ticket.plan} - 2GB data, unlimited calls and texts</p>
+            <p className="text-sm text-muted-foreground">{ticket.plan}</p>
           </div>
 
           <div>
@@ -56,7 +60,7 @@ export function TicketDetailsModal({ isOpen, onClose, ticket }: TicketDetailsMod
             <div className="space-y-2 text-sm">
               <div>
                 <span className="text-muted-foreground">Name: </span>
-                <span className="text-foreground">John Customer</span>
+                <span className="text-foreground">{ticket.customer}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Email: </span>
@@ -70,6 +74,56 @@ export function TicketDetailsModal({ isOpen, onClose, ticket }: TicketDetailsMod
                 <span className="text-muted-foreground">Address: </span>
                 <span className="text-foreground">123 Main St, City, State</span>
               </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-medium text-foreground mb-3">Support Agent Information</h3>
+            <div className="space-y-2 text-sm">
+              {ticket.supportAgent ? (
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-muted-foreground">Assigned Agent: </span>
+                    <span className="text-foreground font-medium">{ticket.supportAgent}</span>
+                  </div>
+                  {ticket.supportAgentEmail && (
+                    <div>
+                      <span className="text-muted-foreground">Email: </span>
+                      <span className="text-foreground">{ticket.supportAgentEmail}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <span className="text-muted-foreground">Status: </span>
+                  <span className="text-orange-600 font-medium">No Support Agent Assigned</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-medium text-foreground mb-3">Technician Information</h3>
+            <div className="space-y-2 text-sm">
+              {ticket.technician ? (
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-muted-foreground">Assigned Technician: </span>
+                    <span className="text-foreground font-medium">{ticket.technician}</span>
+                  </div>
+                  {ticket.technicianEmail && (
+                    <div>
+                      <span className="text-muted-foreground">Email: </span>
+                      <span className="text-foreground">{ticket.technicianEmail}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <span className="text-muted-foreground">Status: </span>
+                  <span className="text-orange-600 font-medium">No Technician Assigned</span>
+                </div>
+              )}
             </div>
           </div>
 

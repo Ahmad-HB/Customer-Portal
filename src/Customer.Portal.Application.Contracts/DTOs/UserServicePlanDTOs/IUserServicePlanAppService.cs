@@ -12,7 +12,7 @@ public interface IUserServicePlanAppService : IApplicationService
     
     public Task<UserServicePlanDto> GetUserServicePlanAsync(Guid id);
     
-    public Task SuspendUserServicePlanAsync(Guid id);
+    public Task SuspendUserServicePlanAsync(SuspendUserServicePlanDto input);
     
     public Task ReactivateUserServicePlanAsync(Guid id);
     

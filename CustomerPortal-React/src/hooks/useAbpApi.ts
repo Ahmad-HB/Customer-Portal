@@ -318,6 +318,8 @@ export function useCurrentUserRole() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let isMounted = true
+    
     const fetchUserRole = async () => {
       try {
         setIsLoading(true)
@@ -328,23 +330,40 @@ export function useCurrentUserRole() {
         
         console.log('🔍 [useCurrentUserRole] API Response:', response)
         
-        if (response.success && response.data) {
-          setRoleData(response.data)
-          console.log('🔍 [useCurrentUserRole] Role data set:', response.data)
-        } else {
-          setError(response.message || 'Failed to get user role')
-          console.error('🔍 [useCurrentUserRole] API failed:', response.message)
+        if (isMounted) {
+          if (response.success && response.data) {
+            setRoleData(response.data)
+            console.log('🔍 [useCurrentUserRole] Role data set:', response.data)
+          } else {
+            setError(response.message || 'Failed to get user role')
+            console.error('🔍 [useCurrentUserRole] API failed:', response.message)
+            
+            // Don't set a default role on API failure - let the app handle it
+            // This prevents admin users from being defaulted to customer
+            console.warn('🔍 [useCurrentUserRole] API failed, not setting default role')
+          }
         }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An error occurred'
-        setError(errorMessage)
-        console.error('🔍 [useCurrentUserRole] API error:', errorMessage)
+        if (isMounted) {
+          const errorMessage = err instanceof Error ? err.message : 'An error occurred'
+          setError(errorMessage)
+          console.error('🔍 [useCurrentUserRole] API error:', errorMessage)
+          
+          // Don't set a default role on error - let the app handle it
+          console.warn('🔍 [useCurrentUserRole] API error, not setting default role')
+        }
       } finally {
-        setIsLoading(false)
+        if (isMounted) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchUserRole()
+    
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   // Handle the string response from the new API endpoint

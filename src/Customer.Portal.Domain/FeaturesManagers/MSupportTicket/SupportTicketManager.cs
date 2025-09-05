@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
 using Customer.Portal.Entities;
 using Customer.Portal.Enums;
+using Customer.Portal.FeaturesManagers.MEmail;
 using Customer.Portal.FeaturesManagers.MTicketComment;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Data;
 using Volo.Abp.Domain.Repositories;
@@ -26,6 +29,8 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
     private readonly IRepository<AppUser, Guid> _appUserRepository;
     private readonly IGuidGenerator _guidGenerator;
     private readonly ITicketCommentManager _ticketCommentManager;
+    private readonly IEmailManager _emailManager;
+    private readonly ILogger<SupportTicketManager> _logger;
 
     #endregion
 
@@ -34,13 +39,17 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
     public SupportTicketManager(IRepository<SupportTicket, Guid> supportTicketRepository,
         IRepository<IdentityUser, Guid> userRepository, IGuidGenerator guidGenerator,
         IRepository<AppUser, Guid> appUserRepository,
-        ITicketCommentManager ticketCommentManager)
+        ITicketCommentManager ticketCommentManager,
+        IEmailManager emailManager,
+        ILogger<SupportTicketManager> logger)
     {
         _supportTicketRepository = supportTicketRepository;
         _identityUserRepository = userRepository;
         _guidGenerator = guidGenerator;
         _appUserRepository = appUserRepository;
         _ticketCommentManager = ticketCommentManager;
+        _emailManager = emailManager;
+        _logger = logger;
     }
 
     #endregion
@@ -78,8 +87,6 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
             );
 
             await _supportTicketRepository.InsertAsync(supportTicket2);
-            
-            // await AssignSupportAgentAsync(supportTicket2.Id);
 
         }
         catch (Exception ex)
@@ -96,8 +103,7 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
             .Where(s => s.Id == supportTicketId)
             .Include(x => x.Supportagent)
             .Include(x => x.AppUser)
-            .Include(x => x.Technician)
-            .Include(x => x.TicketComments));
+            .Include(x => x.Technician));
         if (supportTicket == null)
         {
             throw new UserFriendlyException("Support ticket not found.");
@@ -120,23 +126,49 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
             throw new UserFriendlyException("App user not found.");
         }
 
+        var supportTicketQuery = await _supportTicketRepository.GetQueryableAsync();
+        
+        // Simple role-based filtering
         if (appUser.UserType == UserType.Admin)
         {
-            return await _supportTicketRepository.GetListAsync();
+            // Admin can see all tickets
+            return await supportTicketQuery.OrderByDescending(x => x.CreatedAt).ToListAsync();
         }
-
-        if (appUser.UserType == UserType.Technician)
+        else if (appUser.UserType == UserType.Technician)
         {
-            return await _supportTicketRepository.GetListAsync(x => x.TechnicianId == appUserId);
+            // Technician sees tickets assigned to them
+            return await supportTicketQuery
+                .Where(x => x.TechnicianId == identityUserId)
+                .Include(x => x.Technician)
+                .Include(x => x.Supportagent)
+                .Include(x => x.AppUser)
+                .Include(x => x.ServicePlan)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
         }
-
-        if (appUser.UserType == UserType.SupportAgent)
+        else if (appUser.UserType == UserType.SupportAgent)
         {
-            return await _supportTicketRepository.GetListAsync(x => x.SupportagentId == appUserId);
+            // Support agent sees tickets assigned to them
+            return await supportTicketQuery
+                .Where(x => x.SupportagentId == identityUserId)
+                .Include(x => x.Technician)
+                .Include(x => x.Supportagent)
+                .Include(x => x.AppUser)
+                .Include(x => x.ServicePlan)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
         }
         else
         {
-            return await _supportTicketRepository.GetListAsync(x => x.AppUserId == appUserId);
+            // Customer sees their own tickets
+            return await supportTicketQuery
+                .Where(x => x.AppUserId == appUserId)
+                .Include(x => x.Technician)
+                .Include(x => x.Supportagent)
+                .Include(x => x.AppUser)
+                .Include(x => x.ServicePlan)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
         }
     }
 
@@ -151,8 +183,9 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
         await _supportTicketRepository.DeleteAsync(supportTicket);
     }
 
-    public async Task AssignSupportAgentAsync(Guid supportTicketId)
+    public async Task<bool> AssignSupportAgentAsync(Guid supportTicketId)
     {
+        
         var query = await _appUserRepository.GetQueryableAsync();
         var supportTicket = await _supportTicketRepository.FirstOrDefaultAsync(x => x.Id == supportTicketId);
         if (supportTicket == null)
@@ -163,7 +196,7 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
         var availableAgents = await AsyncExecuter.ToListAsync(
             query.Where(x => x.UserType == UserType.SupportAgent && x.IsActive));
 
-        if (availableAgents == null)
+        if (availableAgents == null || !availableAgents.Any())
         {
             throw new UserFriendlyException("No available support agents at the moment.");
         }
@@ -173,38 +206,50 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
 
         if (availableAgent != null)
         {
-            supportTicket.SupportagentId = availableAgent.Id;
+            _logger.LogInformation("Assigning support agent {AgentId} to ticket {TicketId}", availableAgent.Id, supportTicketId);
+            
+            // Use IdentityUserId instead of AppUser.Id since SupportagentId references IdentityUser
+            supportTicket.SupportagentId = availableAgent.IdentityUserId;
+            await _supportTicketRepository.UpdateAsync(supportTicket);
+            
+            _logger.LogInformation("Support agent assigned successfully to ticket {TicketId}. Now sending assignment email.", supportTicketId);
+            
+            // Send assignment email notification
+            var supportAgentName = availableAgent.Name ?? availableAgent.Email ?? "Support Agent";
+            await SendAssignmentUpdateEmailAsync(supportTicket, $"Assigned to Support Agent: {supportAgentName}");
+            
+            _logger.LogInformation("Assignment email process completed for ticket {TicketId}", supportTicketId);
+            
+            
+            return true;
         }
         else
         {
-            throw new UserFriendlyException("No available support agent found.");
+            return false;
         }
-
-        await _supportTicketRepository.UpdateAsync(supportTicket);
-
-        // Notify the assigned agent about the new ticket assignment
-
-        await UpdateTicketStatusAsync(supportTicket.Id, TicketStatus.InProgress);
+        
     }
 
     public async Task AssignTechnicianAsync(Guid supportTicketId, Guid technicianId)
     {
         var supportTicket = await _supportTicketRepository.GetAsync(supportTicketId);
-        var technician = await _appUserRepository.GetAsync(x => x.IdentityUserId == technicianId);
+        var technician = await _appUserRepository.GetAsync(x => x.Id == technicianId);
         if (supportTicket == null)
         {
             throw new UserFriendlyException("Support ticket not found.");
         }
 
-        if (technician == null || technician.UserType != UserType.Technician)
+        if (technician == null ||  technician.UserType != UserType.Technician)
         {
             throw new UserFriendlyException("Invalid technician.");
         }
 
-        supportTicket.TechnicianId = technicianId;
+        supportTicket.TechnicianId = technician.IdentityUserId;
         await _supportTicketRepository.UpdateAsync(supportTicket);
 
-        // Notify the assigned technician about the new ticket assignment
+        // Send assignment email notification
+        var technicianName = technician.Name ?? technician.Email ?? "Technician";
+        await SendAssignmentUpdateEmailAsync(supportTicket, $"Assigned to Technician: {technicianName}");
     }
 
     public async Task UpdateTicketStatusAsync(Guid supportTicketId, TicketStatus status)
@@ -215,10 +260,12 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
             throw new UserFriendlyException("Support ticket not found.");
         }
 
+        var previousStatus = supportTicket.Status;
         supportTicket.Status = status;
         await _supportTicketRepository.UpdateAsync(supportTicket);
 
-        // Notify the user about the status update
+        // Send email notification about status change
+        await SendStatusUpdateEmailAsync(supportTicket, previousStatus.ToString(), status.ToString());
     }
 
     public async Task UpdateTicketPriorityAsync(Guid supportTicketId, TicketPriority priority)
@@ -229,69 +276,156 @@ public class SupportTicketManager : DomainService, ISupportTicketManager
             throw new UserFriendlyException("Support ticket not found.");
         }
 
+        var previousPriority = supportTicket.Priority?.ToString() ?? "Not Set";
         supportTicket.Priority = priority;
         await _supportTicketRepository.UpdateAsync(supportTicket);
 
-        // Notify the user about the priority update
+        // Send email notification about priority change
+        await SendPriorityUpdateEmailAsync(supportTicket, previousPriority, priority.ToString());
     }
 
-    public async Task AddCommentToTicketAsync(Guid supportTicketId, string comment, Guid userId)
-    {
-        var supportTicket = await _supportTicketRepository.GetAsync(supportTicketId);
-        if (supportTicket == null)
-        {
-            throw new UserFriendlyException("Support ticket not found.");
-        }
-
-        await _ticketCommentManager.CreateTicketCommentAsync(new TicketComment(
-            _guidGenerator.Create(),
-            supportTicketId,
-            userId,
-            comment,
-            DateTime.UtcNow
-        ));
-        
-        var ticketComment = await _ticketCommentManager.GetTicketCommentAsync(supportTicketId);
-
-        supportTicket.TicketComments ??= new List<TicketComment>();
-        supportTicket.TicketComments.Add(ticketComment);
-
-        await _supportTicketRepository.UpdateAsync(supportTicket);
-
-        // Notify the user about the new comment
-    }
+    // public async Task AddCommentToTicketAsync(Guid supportTicketId, string comment, Guid userId)
+    // {
+    //     var supportTicket = await _supportTicketRepository.GetAsync(supportTicketId);
+    //     if (supportTicket == null)
+    //     {
+    //         throw new UserFriendlyException("Support ticket not found.");
+    //     }
+    //
+    //     await _ticketCommentManager.CreateTicketCommentAsync(new TicketComment(
+    //         _guidGenerator.Create(),
+    //         supportTicketId,
+    //         userId,
+    //         comment,
+    //         DateTime.UtcNow
+    //     ));
+    //     
+    //     var ticketComment = await _ticketCommentManager.GetTicketCommentAsync(supportTicketId);
+    //
+    //     supportTicket.TicketComments ??= new List<TicketComment>();
+    //     supportTicket.TicketComments.Add(ticketComment);
+    //
+    //     await _supportTicketRepository.UpdateAsync(supportTicket);
+    //
+    //     // Notify the user about the new comment
+    // }
 
     public async Task NotifyUserOnTicketUpdateAsync(Guid supportTicketId, UpdateType updateType)
     {
-        throw new NotImplementedException();
+        // This method is kept for interface compatibility but actual notifications
+        // are handled by the specific update methods (UpdateTicketStatusAsync, 
+        // UpdateTicketPriorityAsync, AssignSupportAgentAsync, AssignTechnicianAsync)
+        await Task.CompletedTask;
     }
 
-    public async Task RemoveCommentFromTicketAsync(Guid supportTicketId, Guid ticketCommentId)
+    // public async Task RemoveCommentFromTicketAsync(Guid supportTicketId, Guid ticketCommentId)
+    // {
+    //     var supportTicket = await _supportTicketRepository.GetAsync(supportTicketId);
+    //     if (supportTicket == null)
+    //     {
+    //         throw new UserFriendlyException("Support ticket not found.");
+    //     }
+    //
+    //     var ticketComment = supportTicket.TicketComments?.FirstOrDefault(c => c.Id == ticketCommentId);
+    //     if (ticketComment == null)
+    //     {
+    //         throw new UserFriendlyException("Ticket comment not found.");
+    //     }
+    //
+    //     if (supportTicket.TicketComments != null)
+    //     {
+    //         supportTicket.TicketComments.Remove(ticketComment);
+    //     }
+    //     else
+    //     {
+    //         throw new UserFriendlyException("This Ticket has no comments.");
+    //     }
+    //
+    //     await _supportTicketRepository.UpdateAsync(supportTicket);
+    //
+    //     // Notify the user about the comment removal
+    // }
+
+    #endregion
+
+    #region Private Email Methods
+
+    private async Task SendStatusUpdateEmailAsync(SupportTicket ticket, string previousStatus, string newStatus)
     {
-        var supportTicket = await _supportTicketRepository.GetAsync(supportTicketId);
-        if (supportTicket == null)
+        try
         {
-            throw new UserFriendlyException("Support ticket not found.");
+            var appUser = await _appUserRepository.GetAsync(ticket.AppUserId);
+            var identityUser = await _identityUserRepository.GetAsync(appUser.IdentityUserId);
+            
+            await _emailManager.SendTicketUpdatedEmailAsync(
+                identityUser.Email, 
+                ticket.Id, 
+                identityUser.Id, 
+                UpdateType.StatusChange, 
+                previousStatus, 
+                newStatus
+            );
         }
-
-        var ticketComment = supportTicket.TicketComments?.FirstOrDefault(c => c.Id == ticketCommentId);
-        if (ticketComment == null)
+        catch (Exception ex)
         {
-            throw new UserFriendlyException("Ticket comment not found.");
+            // Log error but don't throw - email failure shouldn't break the status update
+            _logger.LogError(ex, "Failed to send status update email for ticket {TicketId}", ticket.Id);
         }
+    }
 
-        if (supportTicket.TicketComments != null)
+    private async Task SendPriorityUpdateEmailAsync(SupportTicket ticket, string previousPriority, string newPriority)
+    {
+        try
         {
-            supportTicket.TicketComments.Remove(ticketComment);
+            var appUser = await _appUserRepository.GetAsync(ticket.AppUserId);
+            var identityUser = await _identityUserRepository.GetAsync(appUser.IdentityUserId);
+            
+            await _emailManager.SendTicketUpdatedEmailAsync(
+                identityUser.Email, 
+                ticket.Id, 
+                identityUser.Id, 
+                UpdateType.PriorityChange, 
+                previousPriority, 
+                newPriority
+            );
         }
-        else
+        catch (Exception ex)
         {
-            throw new UserFriendlyException("This Ticket has no comments.");
+            // Log error but don't throw - email failure shouldn't break the priority update
+            _logger.LogError(ex, "Failed to send priority update email for ticket {TicketId}", ticket.Id);
         }
+    }
 
-        await _supportTicketRepository.UpdateAsync(supportTicket);
-
-        // Notify the user about the comment removal
+    private async Task SendAssignmentUpdateEmailAsync(SupportTicket ticket, string assignmentDescription)
+    {
+        try
+        {
+            _logger.LogInformation("Starting to send assignment update email for ticket {TicketId} with description: {AssignmentDescription}", 
+                ticket.Id, assignmentDescription);
+            
+            var appUser = await _appUserRepository.GetAsync(ticket.AppUserId);
+            var identityUser = await _identityUserRepository.GetAsync(appUser.IdentityUserId);
+            
+            _logger.LogInformation("Retrieved user data for assignment email - AppUser: {AppUserId}, IdentityUser: {IdentityUserId}, Email: {Email}", 
+                appUser.Id, identityUser.Id, identityUser.Email);
+            
+            await _emailManager.SendTicketUpdatedEmailAsync(
+                identityUser.Email, 
+                ticket.Id, 
+                identityUser.Id, 
+                UpdateType.AssignmentChange, 
+                "Unassigned", 
+                assignmentDescription
+            );
+            
+            _logger.LogInformation("Successfully sent assignment update email for ticket {TicketId}", ticket.Id);
+        }
+        catch (Exception ex)
+        {
+            // Log error but don't throw - email failure shouldn't break the assignment
+            _logger.LogError(ex, "Failed to send assignment update email for ticket {TicketId}. Error: {ErrorMessage}", 
+                ticket.Id, ex.Message);
+        }
     }
 
     #endregion

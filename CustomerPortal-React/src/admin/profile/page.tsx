@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { User, Mail, Phone, Shield, Camera, Save, Edit } from "lucide-react"
+import { User, Mail, Phone, Shield, Camera, Save, Edit, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,10 +10,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { RoleBasedAccess } from "@/components/RoleBasedAccess"
 import { useAuth } from "@/contexts/AuthContext"
+import { apiClient } from "@/lib/api-client"
+import { ColorScheme } from "@/lib/color-scheme"
 
 export default function AdminProfilePage() {
-  const { user } = useAuth()
+  const { user, updateUser } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const [profile, setProfile] = useState({
     firstName: "",
     lastName: "",
@@ -52,11 +57,42 @@ export default function AdminProfilePage() {
     }))
   }
 
-  const handleSave = () => {
-    // Handle profile save logic here
-    console.log("Saving profile:", profile)
-    setIsEditing(false)
-    // Show success message
+  const handleSave = async () => {
+    setError("")
+    setSuccess("")
+    setIsLoading(true)
+
+    try {
+      // Update profile via API
+      const response = await apiClient.updateUser({
+        name: profile.firstName,
+        email: profile.email,
+        phone: profile.phone
+      })
+
+      if (response.success) {
+        // Update the user context with new data
+        updateUser({
+          ...user,
+          name: profile.firstName,
+          email: profile.email,
+          phone: profile.phone
+        })
+        
+        setSuccess("Profile updated successfully!")
+        setIsEditing(false)
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(""), 3000)
+      } else {
+        setError(response.message || "Failed to update profile")
+      }
+    } catch (err) {
+      console.error("Error updating profile:", err)
+      setError("Failed to update profile. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleCancel = () => {
@@ -75,6 +111,8 @@ export default function AdminProfilePage() {
         language: "English"
       })
     }
+    setError("")
+    setSuccess("")
     setIsEditing(false)
   }
 
@@ -90,12 +128,21 @@ export default function AdminProfilePage() {
           <div className="flex gap-3">
             {isEditing ? (
               <>
-                <Button variant="outline" onClick={handleCancel}>
+                <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
                   Cancel
                 </Button>
-                <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
+                <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
+                  {isLoading ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving...
+                    </div>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
                 </Button>
               </>
             ) : (
@@ -106,6 +153,20 @@ export default function AdminProfilePage() {
             )}
           </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className={`p-4 ${ColorScheme.alerts.error.bg} border ${ColorScheme.alerts.error.border} rounded-lg`}>
+            <p className={`${ColorScheme.alerts.error.text} text-sm`}>{error}</p>
+          </div>
+        )}
+
+        {/* Success Message */}
+        {success && (
+          <div className={`p-4 ${ColorScheme.alerts.success.bg} border ${ColorScheme.alerts.success.border} rounded-lg`}>
+            <p className={`${ColorScheme.alerts.success.text} text-sm`}>{success}</p>
+          </div>
+        )}
 
         {/* Profile Overview */}
         <div className="grid gap-6 lg:grid-cols-3">
@@ -171,7 +232,7 @@ export default function AdminProfilePage() {
                       id="first-name"
                       value={profile.firstName}
                       onChange={(e) => handleProfileChange('firstName', e.target.value)}
-                      disabled={!isEditing}
+                      disabled={!isEditing || isLoading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -180,7 +241,7 @@ export default function AdminProfilePage() {
                       id="last-name"
                       value={profile.lastName}
                       onChange={(e) => handleProfileChange('lastName', e.target.value)}
-                      disabled={!isEditing}
+                      disabled={!isEditing || isLoading}
                     />
                   </div>
                 </div>
@@ -190,7 +251,7 @@ export default function AdminProfilePage() {
                     id="bio"
                     value={profile.bio}
                     onChange={(e) => handleProfileChange('bio', e.target.value)}
-                    disabled={!isEditing}
+                    disabled={!isEditing || isLoading}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -200,7 +261,7 @@ export default function AdminProfilePage() {
                       id="title"
                       value={profile.title}
                       onChange={(e) => handleProfileChange('title', e.target.value)}
-                      disabled={!isEditing}
+                      disabled={!isEditing || isLoading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -209,7 +270,7 @@ export default function AdminProfilePage() {
                       id="department"
                       value={profile.department}
                       onChange={(e) => handleProfileChange('department', e.target.value)}
-                      disabled={!isEditing}
+                      disabled={!isEditing || isLoading}
                     />
                   </div>
                 </div>
@@ -244,7 +305,7 @@ export default function AdminProfilePage() {
                     type="email"
                     value={profile.email}
                     onChange={(e) => handleProfileChange('email', e.target.value)}
-                    disabled={!isEditing}
+                    disabled={!isEditing || isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -253,7 +314,7 @@ export default function AdminProfilePage() {
                     id="phone"
                     value={profile.phone}
                     onChange={(e) => handleProfileChange('phone', e.target.value)}
-                    disabled={!isEditing}
+                    disabled={!isEditing || isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -262,7 +323,7 @@ export default function AdminProfilePage() {
                     id="location"
                     value={profile.location}
                     onChange={(e) => handleProfileChange('location', e.target.value)}
-                    disabled={!isEditing}
+                    disabled={!isEditing || isLoading}
                   />
                 </div>
               </CardContent>
@@ -282,7 +343,7 @@ export default function AdminProfilePage() {
                       id="timezone"
                       value={profile.timezone}
                       onChange={(e) => handleProfileChange('timezone', e.target.value)}
-                      disabled={!isEditing}
+                      disabled={!isEditing || isLoading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -291,7 +352,7 @@ export default function AdminProfilePage() {
                       id="language"
                       value={profile.language}
                       onChange={(e) => handleProfileChange('language', e.target.value)}
-                      disabled={!isEditing}
+                      disabled={!isEditing || isLoading}
                     />
                   </div>
                 </div>
